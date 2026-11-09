@@ -155,20 +155,63 @@ button {
   cursor: default;
 }
 
-.whole-tree {
+.masthead-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.25rem;
   margin-top: 0.8rem;
+}
+
+.trial {
+  margin-top: 0.9rem;
+  max-width: 17rem;
+  color: var(--warm);
+}
+
+/* ---- buttons ------------------------------------------------------------ */
+
+button.quiet {
   padding: 0;
   border: 0;
   background: none;
   color: var(--haze);
   font-size: 0.85rem;
+  text-align: left;
   text-decoration: underline;
   text-decoration-color: var(--line);
   text-underline-offset: 0.3em;
 }
 
-.whole-tree:hover {
+button.quiet:hover:not(:disabled) {
   color: var(--paper);
+}
+
+.button,
+button.primary {
+  display: inline-block;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--paper);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--paper);
+}
+
+button.primary {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: #000;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---- key ---------------------------------------------------------------- */
@@ -405,6 +448,208 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- editing form ------------------------------------------------------- */
+
+.editor h2 {
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.field {
+  margin-top: 1.25rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.field label:not(.button),
+.field .label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--haze);
+  font-size: 0.85rem;
+}
+
+.field input:not([type='file']),
+.field textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.04);
+  color: var(--paper);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--paper);
+}
+
+.field input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.field label.button:focus-within {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+.help {
+  margin-top: 0.35rem;
+  color: var(--haze);
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.1rem;
+}
+
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.chosen li {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.2rem 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.chosen button {
+  padding: 0 0.4rem;
+  border: 0;
+  background: none;
+  color: var(--haze);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.chosen button:hover {
+  color: var(--paper);
+}
+
+.picker-input {
+  position: relative;
+}
+
+.options {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+}
+
+.options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.options li.active {
+  background: var(--wash);
+}
+
+.options .years,
+.options .none {
+  color: var(--haze);
+  font-variant-numeric: tabular-nums;
+}
+
+.portrait-preview {
+  display: block;
+  width: 7rem;
+  height: 8.5rem;
+  margin-bottom: 0.6rem;
+  border-radius: 3px;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+
+.photo-list {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.photo-list li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.photo-list img {
+  width: 4.5rem;
+  height: 3.4rem;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.error {
+  margin-top: 1.25rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ff8f7a;
+  border-radius: 3px;
+  color: #ffb3a4;
+}
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 1.75rem -1.75rem 0;
+  padding: 0.9rem 1.75rem;
+  border-top: 1px solid var(--line);
+  background: #000;
+}
+
+.danger {
+  margin-top: 1.5rem;
+}
+
+.danger p {
+  margin-bottom: 0.6rem;
+}
+
 /* ---- photo viewer ------------------------------------------------------- */
 
 .lightbox {
@@ -479,6 +724,11 @@ button {
 
   .panel-body {
     padding: 1.4rem 1.25rem 3rem;
+  }
+
+  .save-bar {
+    margin: 1.75rem -1.25rem 0;
+    padding: 0.9rem 1.25rem;
   }
 }
 

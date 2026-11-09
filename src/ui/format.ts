@@ -27,7 +27,8 @@ export function lifeDates(p: Pick<Person, 'born' | 'died'>) {
   return ''
 }
 
-export const asset = (path: string) => import.meta.env.BASE_URL + path
+/** Photos from the project are relative paths; uploaded ones are complete addresses. */
+export const asset = (path: string) => (/^(https?:|data:|blob:)/.test(path) ? path : import.meta.env.BASE_URL + path)
 
 export const fold = (s: string) =>
   s

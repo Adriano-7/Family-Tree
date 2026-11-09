@@ -3,7 +3,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
-import { marked } from 'marked'
 import sharp from 'sharp'
 
 const contentDir = path.resolve(process.env.CONTENT_DIR ?? 'content')
@@ -40,8 +39,11 @@ function idList(value, field, file) {
 // ---- read people -----------------------------------------------------------
 
 if (!(await exists(peopleDir))) {
-  console.error(`No people folder found at ${peopleDir}`)
-  process.exit(1)
+  // Fine when the family tree lives in the online database: the site then starts from nothing here.
+  console.log(`content: no people folder at ${peopleDir}, writing an empty list`)
+  await fs.mkdir(path.dirname(outJson), { recursive: true })
+  await fs.writeFile(outJson, '[]\n')
+  process.exit(0)
 }
 
 const files = (await fs.readdir(peopleDir)).filter((f) => f.endsWith('.md')).sort()
@@ -82,7 +84,7 @@ for (const file of files) {
     spouses: idList(d.spouses, 'spouses', label),
     portrait: d.portrait ? String(d.portrait) : null,
     gallery,
-    html: marked.parse(parsed.content.trim(), { async: false }),
+    bio: parsed.content.trim(),
   })
 }
 
@@ -143,7 +145,7 @@ for (const p of raw) {
     thumb: null,
     portrait: null,
     gallery: [],
-    html: p.html,
+    bio: p.bio,
   }
   const srcOf = (file) => path.join(photosDir, p.id, file)
   const missing = (file) => fail(p.label, `photo "${file}" was not found in content/photos/${p.id}/`)

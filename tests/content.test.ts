@@ -36,7 +36,7 @@ describe('build-content', () => {
     expect(r.stderr).toBe('')
     const ana = r.people.find((p: { id: string }) => p.id === 'ana')
     expect(ana).toMatchObject({ name: 'Ana', born: '1938-04-12', died: '2015', thumb: 'photos/ana/_thumb.webp' })
-    expect(ana.html).toContain('<em>text</em>')
+    expect(ana.bio).toBe('Some *text*.')
     expect(ana.gallery[0]).toMatchObject({ src: 'photos/ana/me.webp', caption: 'Hello', width: 400, height: 600 })
     expect(fs.existsSync(path.join(r.photos, 'ana', '_thumb.webp'))).toBe(true)
     expect(r.people.find((p: { id: string }) => p.id === 'rui').parents).toEqual(['ana'])

@@ -3,6 +3,7 @@ import { type Graph, siblings } from '../data/graph'
 import type { Person } from '../data/types'
 import { initialsOf } from '../scene/textures'
 import { asset, lifeDates, lifeYears } from './format'
+import { renderBio } from './bio'
 import { Gallery } from './Gallery'
 import { personHref } from './hooks'
 import { strings } from './strings'
@@ -11,6 +12,8 @@ interface Props {
   graph: Graph
   person: Person
   onClose: () => void
+  onEdit: () => void
+  onAdd: (relative: 'child' | 'partner' | 'parent' | 'sibling') => void
 }
 
 function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph: Props['graph'] }) {
@@ -42,7 +45,7 @@ function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph:
   )
 }
 
-export function PersonPanel({ graph, person, onClose }: Props) {
+export function PersonPanel({ graph, person, onClose, onEdit, onAdd }: Props) {
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export function PersonPanel({ graph, person, onClose }: Props) {
 
   const dates = lifeDates(person)
   const partners = graph.spouses.get(person.id) ?? []
+  const parentCount = person.parents.filter((p) => graph.byId.has(p)).length
 
   return (
     <aside ref={panel} className="panel" tabIndex={-1} aria-labelledby="person-name">
@@ -72,7 +76,7 @@ export function PersonPanel({ graph, person, onClose }: Props) {
             {[dates, person.birthplace && strings.bornIn(person.birthplace)].filter(Boolean).join(', ')}
           </p>
         )}
-        {person.html && <div className="story" dangerouslySetInnerHTML={{ __html: person.html }} />}
+        {person.bio && <div className="story" dangerouslySetInnerHTML={{ __html: renderBio(person.bio) }} />}
         {person.gallery.length > 0 && (
           <section>
             <h3>{strings.photos}</h3>
@@ -83,6 +87,27 @@ export function PersonPanel({ graph, person, onClose }: Props) {
         <Relatives title={partners.length > 1 ? strings.partners : strings.partner} ids={partners} graph={graph} />
         <Relatives title={strings.children} ids={graph.children.get(person.id) ?? []} graph={graph} />
         <Relatives title={strings.siblings} ids={siblings(graph, person.id)} graph={graph} />
+        <div className="edit-actions">
+          <button type="button" className="button" onClick={onEdit}>
+            {strings.edit}
+          </button>
+          <button type="button" className="quiet" onClick={() => onAdd('child')}>
+            {strings.addChild}
+          </button>
+          <button type="button" className="quiet" onClick={() => onAdd('partner')}>
+            {strings.addPartner}
+          </button>
+          {parentCount < 2 && (
+            <button type="button" className="quiet" onClick={() => onAdd('parent')}>
+              {strings.addParent}
+            </button>
+          )}
+          {parentCount > 0 && (
+            <button type="button" className="quiet" onClick={() => onAdd('sibling')}>
+              {strings.addSibling}
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   )

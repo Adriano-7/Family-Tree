@@ -17,5 +17,6 @@ export interface Person {
   thumb: string | null
   portrait: string | null
   gallery: GalleryImage[]
-  html: string
+  /** The story, as Markdown text. */
+  bio: string
 }

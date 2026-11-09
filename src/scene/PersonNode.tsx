@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Person } from '../data/types'
+import { asset } from '../ui/format'
 import type { Vec3 } from './layout'
 import { firstNameOf, shortNameOf, haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
 
@@ -46,7 +47,9 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
     if (!person.thumb) return
     let alive = true
     let loaded: THREE.Texture | undefined
-    new THREE.TextureLoader().load(import.meta.env.BASE_URL + person.thumb, (t) => {
+    const loader = new THREE.TextureLoader()
+    loader.setCrossOrigin('anonymous')
+    loader.load(asset(person.thumb), (t) => {
       if (!alive) return t.dispose()
       t.colorSpace = THREE.SRGBColorSpace
       loaded = t
