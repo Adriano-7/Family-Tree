@@ -4,7 +4,7 @@ import type { Person } from './data/types'
 import peopleJson from './generated/people.json'
 import Constellation from './scene/Constellation'
 import { computeLayout } from './scene/layout'
-import { DISPLAY_FONT, TEXT_FONT } from './scene/textures'
+import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { useMediaQuery, useSelectedPerson } from './ui/hooks'
 import { PersonPanel } from './ui/PersonPanel'
 import { Search } from './ui/Search'
@@ -18,7 +18,7 @@ function useFontsReady() {
   useEffect(() => {
     const done = () => setReady(true)
     const timeout = setTimeout(done, 2000)
-    Promise.all([document.fonts.load(`500 40px ${TEXT_FONT}`), document.fonts.load(`500 100px ${DISPLAY_FONT}`)])
+    Promise.all([document.fonts.load(LABEL_FONT), document.fonts.load(`500 92px ${DISPLAY_FONT}`)])
       .catch(() => undefined)
       .then(done)
     return () => clearTimeout(timeout)
@@ -28,7 +28,8 @@ function useFontsReady() {
 
 export default function App() {
   const graph = useMemo(() => buildGraph(people), [])
-  const positions = useMemo(() => computeLayout(graph), [graph])
+  const layout = useMemo(() => computeLayout(graph), [graph])
+  const [overviewRequest, setOverviewRequest] = useState(0)
   const [selectedId, select] = useSelectedPerson()
   const selected = selectedId ? graph.byId.get(selectedId) : undefined
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
@@ -45,7 +46,8 @@ export default function App() {
       {fontsReady && people.length > 0 && (
         <Constellation
           graph={graph}
-          positions={positions}
+          layout={layout}
+          overviewRequest={overviewRequest}
           selectedId={selected?.id ?? null}
           onSelect={select}
           reducedMotion={reducedMotion}
@@ -57,6 +59,18 @@ export default function App() {
         <h1>{strings.title}</h1>
         <p>{people.length ? strings.summary(people.length, graph.generationCount) : strings.empty}</p>
         {people.length > 0 && <Search people={people} onSelect={select} />}
+        {people.length > 0 && (
+          <button
+            type="button"
+            className="whole-tree"
+            onClick={() => {
+              select(null)
+              setOverviewRequest((n) => n + 1)
+            }}
+          >
+            {strings.wholeTree}
+          </button>
+        )}
       </header>
 
       {people.length > 0 && (

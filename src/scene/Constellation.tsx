@@ -1,127 +1,115 @@
-import { CameraControls, Stars } from '@react-three/drei'
-import { Canvas, useFrame } from '@react-three/fiber'
-import type CameraControlsImpl from 'camera-controls'
+import { CameraControls, CameraControlsImpl } from '@react-three/drei'
+import { Canvas, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { closeFamily, type Graph } from '../data/graph'
+import { type Graph, lineage } from '../data/graph'
 import { Links } from './Links'
-import type { Vec3 } from './layout'
+import type { Layout } from './layout'
 import { PersonNode } from './PersonNode'
 
 interface Props {
   graph: Graph
-  positions: Map<string, Vec3>
+  layout: Layout
   selectedId: string | null
   onSelect: (id: string) => void
   reducedMotion: boolean
   /** True when the person panel covers the right side of a wide screen. */
   panelBeside: boolean
+  /** Changes every time the visitor asks to see the whole tree again. */
+  overviewRequest: number
 }
 
-const SKY = '#0b1230'
-const OLDEST = new THREE.Color('#f6d99a')
-const YOUNGEST = new THREE.Color('#a9c8ff')
-const FOCUS_DISTANCE = 11
+const SKY = '#000000'
+// Like real stars: the oldest burn orange, the youngest blue-white.
+const OLDEST = new THREE.Color('#ffb98a')
+const MIDDLE = new THREE.Color('#fff3e4')
+const YOUNGEST = new THREE.Color('#bcd6ff')
+const FOCUS_DISTANCE = 13
+const FOV = 45
 
-function Scene({ graph, positions, selectedId, onSelect, reducedMotion, panelBeside }: Props) {
+// The tree is a flat chart: dragging slides it, the wheel or a pinch zooms. It never rotates.
+const { ACTION } = CameraControlsImpl
+const PAN_WITH_MOUSE = { left: ACTION.TRUCK, middle: ACTION.TRUCK, right: ACTION.TRUCK, wheel: ACTION.DOLLY }
+const PAN_WITH_TOUCH = { one: ACTION.TOUCH_TRUCK, two: ACTION.TOUCH_DOLLY_TRUCK, three: ACTION.TOUCH_DOLLY_TRUCK }
+
+function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside, overviewRequest }: Props) {
   const controls = useRef<CameraControlsImpl>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
-  const lastTouched = useRef(-Infinity)
   const started = useRef(false)
+  const lastOverview = useRef(overviewRequest)
+  const aspect = useThree((s) => s.size.width / s.size.height)
+  const aspectRef = useRef(aspect)
+  aspectRef.current = aspect
+  const { positions } = layout
 
   const radius = useMemo(() => {
-    let r = 6
+    let r = 8
     for (const [x, y, z] of positions.values()) r = Math.max(r, Math.hypot(x, y, z))
-    return r + 2
+    return r + 4
   }, [positions])
+
+  /** How far back the camera must be, on the z axis, to see everybody. */
+  const overviewDistance = (aspect: number) => {
+    const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2))
+    let distance = 12
+    for (const [x, y, z] of positions.values())
+      distance = Math.max(distance, z + (Math.abs(x) + 3.5) / (tan * aspect), z + (Math.abs(y) + 4) / tan)
+    return distance
+  }
 
   const tints = useMemo(() => {
     const last = Math.max(1, graph.generationCount - 1)
-    return Array.from({ length: graph.generationCount }, (_, g) => OLDEST.clone().lerp(YOUNGEST, g / last))
+    return Array.from({ length: graph.generationCount }, (_, g) => {
+      const t = g / last
+      return t < 0.5 ? OLDEST.clone().lerp(MIDDLE, t * 2) : MIDDLE.clone().lerp(YOUNGEST, t * 2 - 1)
+    })
   }, [graph.generationCount])
 
-  // A small family can show every name at once; a large one shows names as you come closer.
-  const labelRange = useMemo<[number, number]>(
-    () => (graph.people.length <= 30 ? [radius * 2.4, radius * 3.4] : [16, 30]),
-    [graph.people.length, radius],
-  )
-
   const focusId = hoverId ?? selectedId
-  const family = useMemo(() => (focusId ? closeFamily(graph, focusId) : null), [graph, focusId])
+  const focus = useMemo(() => (focusId ? lineage(graph, focusId) : null), [graph, focusId])
 
   useEffect(() => {
     document.body.style.cursor = hoverId ? 'pointer' : ''
     return () => void (document.body.style.cursor = '')
   }, [hoverId])
 
-  // Camera: whole sky on arrival, then fly to whoever is selected.
+  // Camera: the whole tree from the front on arrival and on request, otherwise fly to whoever is selected.
   useEffect(() => {
     const c = controls.current
     if (!c) return
     const animate = started.current && !reducedMotion
-    if (!started.current) {
-      started.current = true
-      c.setLookAt(radius * 0.45, radius * 0.2, radius * 1.75, 0, 0, 0, false)
-    }
+    const asked = lastOverview.current !== overviewRequest
+    lastOverview.current = overviewRequest
     const target = selectedId && positions.get(selectedId)
+
+    if (!started.current || (asked && !target)) {
+      void c.setLookAt(0, 0, overviewDistance(aspectRef.current), 0, 0, 0, animate)
+    }
+    started.current = true
+
     if (target) {
+      // Face the person straight on.
       const [x, y, z] = target
-      const here = new THREE.Vector3(x, y, z)
-      const dir = c.camera.position.clone().sub(here)
-      dir.y *= 0.25
-      if (dir.lengthSq() < 0.01) dir.set(0, 0, 1)
-      // Look across the nearest neighbour (usually a partner) instead of through them.
-      let nearest: THREE.Vector3 | null = null
-      for (const [id, p] of positions) {
-        if (id === selectedId) continue
-        const offset = new THREE.Vector3(...p).sub(here)
-        if (offset.length() < 6 && (!nearest || offset.length() < nearest.length())) nearest = offset
-      }
-      if (nearest) {
-        const side = new THREE.Vector3(-nearest.z, 0, nearest.x)
-        if (side.lengthSq() > 0.01) {
-          if (side.dot(dir) < 0) side.negate()
-          dir.copy(side).setY(side.length() * 0.12)
-        }
-      }
-      dir.normalize().multiplyScalar(FOCUS_DISTANCE)
-      void c.setLookAt(x + dir.x, y + dir.y, z + dir.z, x, y, z, animate)
-      void c.setFocalOffset(panelBeside ? 2.6 : 0, 0, 0, animate)
+      void c.setLookAt(x, y + 0.8, z + FOCUS_DISTANCE, x, y - 0.6, z, animate)
+      void c.setFocalOffset(panelBeside ? 3 : 0, 0, 0, animate)
     } else {
       void c.setFocalOffset(0, 0, 0, animate)
     }
-  }, [selectedId, positions, radius, reducedMotion, panelBeside])
-
-  useEffect(() => {
-    const c = controls.current
-    if (!c) return
-    const touch = () => (lastTouched.current = performance.now())
-    c.addEventListener('control', touch)
-    return () => c.removeEventListener('control', touch)
-  }, [])
-
-  // Slow drift while nobody is steering.
-  useFrame((_, delta) => {
-    if (reducedMotion || selectedId || hoverId || !controls.current) return
-    if (performance.now() - lastTouched.current < 5000) return
-    void controls.current.rotate(delta * 0.025, 0, false)
-  })
+  }, [selectedId, positions, reducedMotion, panelBeside, overviewRequest])
 
   return (
     <>
       <color attach="background" args={[SKY]} />
-      <fog attach="fog" args={[SKY, radius * 1.4, radius * 5]} />
-      <Stars radius={radius * 4} depth={radius * 2} count={2600} factor={radius * 0.28} saturation={0.4} fade speed={0} />
-      <Links graph={graph} positions={positions} focusId={focusId} />
+      <fog attach="fog" args={[SKY, radius * 2.2, radius * 7]} />
+      <Links segments={layout.segments} line={focus?.line ?? null} shown={focus?.shown ?? null} />
       {graph.people.map((p) => (
         <PersonNode
           key={p.id}
           person={p}
           position={positions.get(p.id)!}
           tint={tints[graph.generation.get(p.id)!]}
-          emphasis={!family ? 'normal' : family.has(p.id) ? 'lit' : 'dim'}
+          emphasis={!focus ? 'normal' : focus.shown.has(p.id) ? 'lit' : 'dim'}
           active={p.id === focusId}
-          labelRange={labelRange}
           onHover={setHoverId}
           onSelect={onSelect}
         />
@@ -130,9 +118,12 @@ function Scene({ graph, positions, selectedId, onSelect, reducedMotion, panelBes
         ref={controls}
         makeDefault
         minDistance={4}
-        maxDistance={radius * 3.2}
+        maxDistance={radius * 4}
         smoothTime={0.35}
-        draggingSmoothTime={0.12}
+        draggingSmoothTime={0.08}
+        dollyToCursor
+        mouseButtons={PAN_WITH_MOUSE}
+        touches={PAN_WITH_TOUCH}
       />
     </>
   )
@@ -143,7 +134,7 @@ export default function Constellation(props: Props) {
     <Canvas
       className="sky"
       dpr={[1, 2]}
-      camera={{ fov: 45, near: 0.1, far: 2000, position: [0, 0, 60] }}
+      camera={{ fov: FOV, near: 0.1, far: 4000, position: [0, 0, 60] }}
       gl={{ antialias: true }}
       aria-hidden="true"
     >

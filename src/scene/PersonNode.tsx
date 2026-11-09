@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Person } from '../data/types'
 import type { Vec3 } from './layout'
-import { haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
+import { firstNameOf, shortNameOf, haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
 
 export type NodeEmphasis = 'normal' | 'lit' | 'dim'
 
@@ -14,28 +14,34 @@ interface Props {
   tint: THREE.Color
   emphasis: NodeEmphasis
   active: boolean
-  /** Camera distances at which the name is fully visible and fully hidden. */
-  labelRange: [number, number]
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
 }
 
 const RADIUS = 0.9
+const LABEL_HEIGHT = 0.62
+/** Beyond this distance names stop shrinking with distance (up to GROW_MAX times). */
+const GROW_FROM = 26
+const GROW_MAX = 2.7
 const scratch = new THREE.Vector3()
 
-export function PersonNode({ person, position, tint, emphasis, active, labelRange, onHover, onSelect }: Props) {
+export function PersonNode({ person, position, tint, emphasis, active, onHover, onSelect }: Props) {
   const group = useRef<THREE.Group>(null)
   const disc = useRef<THREE.MeshBasicMaterial>(null)
   const ring = useRef<THREE.MeshBasicMaterial>(null)
   const glow = useRef<THREE.MeshBasicMaterial>(null)
   const label = useRef<THREE.MeshBasicMaterial>(null)
+  const shortLabel = useRef<THREE.MeshBasicMaterial>(null)
+  const labels = useRef<THREE.Group>(null)
 
   const initials = useMemo(() => initialsTexture(person.name, tint), [person.name, tint])
-  const nameTexture = useMemo(() => labelTexture(person.name), [person.name])
+  const nameTexture = useMemo(() => labelTexture(shortNameOf(person.name)), [person.name])
+  const firstNameTexture = useMemo(() => labelTexture(firstNameOf(person.name)), [person.name])
   const [photo, setPhoto] = useState<THREE.Texture | null>(null)
 
   useEffect(() => () => initials.dispose(), [initials])
   useEffect(() => () => nameTexture.dispose(), [nameTexture])
+  useEffect(() => () => firstNameTexture.dispose(), [firstNameTexture])
   useEffect(() => {
     if (!person.thumb) return
     let alive = true
@@ -54,7 +60,8 @@ export function PersonNode({ person, position, tint, emphasis, active, labelRang
   }, [person.thumb])
 
   useFrame(({ camera }, delta) => {
-    if (!group.current || !disc.current || !ring.current || !glow.current || !label.current) return
+    if (!group.current || !disc.current || !ring.current || !glow.current) return
+    if (!label.current || !shortLabel.current || !labels.current) return
     const k = 1 - Math.exp(-delta * 9)
     const dim = emphasis === 'dim'
     const scale = active ? 1.3 : emphasis === 'lit' ? 1.08 : 1
@@ -63,13 +70,15 @@ export function PersonNode({ person, position, tint, emphasis, active, labelRang
     ring.current.opacity += ((dim ? 0.15 : 1) - ring.current.opacity) * k
     glow.current.opacity += ((dim ? 0.04 : active ? 0.5 : emphasis === 'lit' ? 0.4 : 0.3) - glow.current.opacity) * k
 
-    let labelOpacity = 0
-    if (emphasis === 'lit') labelOpacity = 1
-    else if (emphasis === 'normal') {
-      const d = camera.position.distanceTo(group.current.getWorldPosition(scratch))
-      labelOpacity = THREE.MathUtils.clamp((labelRange[1] - d) / (labelRange[1] - labelRange[0]), 0, 1) * 0.9
-    }
-    label.current.opacity += (labelOpacity - label.current.opacity) * k
+    // Names: a first name under every star; first and last name for the one in focus.
+    const d = camera.position.distanceTo(group.current.getWorldPosition(scratch))
+    const grow = THREE.MathUtils.clamp(d / GROW_FROM, 1, GROW_MAX)
+    labels.current.scale.setScalar(grow)
+    labels.current.position.y = -RADIUS - 0.18 - (LABEL_HEIGHT / 2) * grow
+    const full = active ? 1 : 0
+    const strength = dim ? 0.22 : 1
+    label.current.opacity += (full * strength - label.current.opacity) * k
+    shortLabel.current.opacity += ((1 - full) * strength - shortLabel.current.opacity) * k
   })
 
   return (
@@ -108,18 +117,26 @@ export function PersonNode({ person, position, tint, emphasis, active, labelRang
           <circleGeometry args={[RADIUS, 48]} />
           <meshBasicMaterial ref={disc} map={photo ?? initials} transparent toneMapped={false} />
         </mesh>
-        <mesh position-y={-RADIUS - 0.62} renderOrder={3}>
-          <planeGeometry args={[0.62 * LABEL_ASPECT, 0.62]} />
-          <meshBasicMaterial
-            ref={label}
-            map={nameTexture}
-            transparent
-            opacity={0}
-            depthWrite={false}
-            toneMapped={false}
-            fog={false}
-          />
-        </mesh>
+        <group ref={labels}>
+          {[
+            [label, nameTexture] as const,
+            [shortLabel, firstNameTexture] as const,
+          ].map(([ref, texture], i) => (
+            <mesh key={i} renderOrder={3}>
+              <planeGeometry args={[LABEL_HEIGHT * LABEL_ASPECT, LABEL_HEIGHT]} />
+              <meshBasicMaterial
+                ref={ref}
+                map={texture}
+                transparent
+                opacity={0}
+                depthWrite={false}
+                depthTest={false}
+                toneMapped={false}
+                fog={false}
+              />
+            </mesh>
+          ))}
+        </group>
       </group>
     </Billboard>
   )

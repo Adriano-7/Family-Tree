@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
-export const DISPLAY_FONT = 'Fraunces'
-export const TEXT_FONT = 'Figtree'
+export const DISPLAY_FONT = '"Hanken Grotesk"'
+export const LABEL_FONT = `500 40px ${DISPLAY_FONT}`
 
 function canvas(width: number, height: number) {
   const c = document.createElement('canvas')
@@ -41,17 +41,17 @@ export function initialsOf(name: string) {
 /** Stands in for the portrait of someone without a photo. */
 export function initialsTexture(name: string, tint: THREE.Color) {
   const [c, ctx] = canvas(256, 256)
-  const dark = tint.clone().multiplyScalar(0.3)
+  const dark = tint.clone().multiplyScalar(0.07)
   const g = ctx.createRadialGradient(128, 90, 10, 128, 128, 150)
-  g.addColorStop(0, `#${tint.clone().multiplyScalar(0.55).getHexString()}`)
+  g.addColorStop(0, `#${tint.clone().multiplyScalar(0.24).getHexString()}`)
   g.addColorStop(1, `#${dark.getHexString()}`)
   ctx.fillStyle = g
   ctx.fillRect(0, 0, 256, 256)
-  ctx.fillStyle = `#${tint.clone().lerp(new THREE.Color('#ffffff'), 0.6).getHexString()}`
-  ctx.font = `500 104px ${DISPLAY_FONT}, Georgia, serif`
+  ctx.fillStyle = `#${tint.clone().lerp(new THREE.Color('#ffffff'), 0.35).getHexString()}`
+  ctx.font = `500 92px ${DISPLAY_FONT}, system-ui, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(initialsOf(name), 128, 136)
+  ctx.fillText(initialsOf(name), 128, 134)
   return toTexture(c)
 }
 
@@ -63,13 +63,21 @@ export function labelTexture(name: string) {
   ctx.textBaseline = 'middle'
   let size = 40
   do {
-    ctx.font = `500 ${size}px ${TEXT_FONT}, system-ui, sans-serif`
+    ctx.font = `500 ${size}px ${DISPLAY_FONT}, system-ui, sans-serif`
     size -= 2
   } while (ctx.measureText(name).width > 496 && size > 18)
-  ctx.shadowColor = 'rgba(5,8,26,0.95)'
+  ctx.shadowColor = 'rgba(0,0,0,0.95)'
   ctx.shadowBlur = 8
-  ctx.fillStyle = '#ece7db'
+  ctx.fillStyle = '#f2efe9'
   ctx.fillText(name, 256, 42)
   ctx.fillText(name, 256, 42)
   return toTexture(c)
+}
+
+export const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name
+
+/** First and last name: short enough to sit under a star without covering the neighbours. */
+export function shortNameOf(name: string) {
+  const words = name.trim().split(/\s+/)
+  return words.length > 1 ? `${words[0]} ${words[words.length - 1]}` : name
 }

@@ -87,3 +87,27 @@ export function siblings(graph: Graph<PersonLinks>, id: string): string[] {
   for (const parent of p.parents) for (const c of graph.children.get(parent) ?? []) if (c !== id) out.add(c)
   return [...out]
 }
+
+/**
+ * A person's line of descent: `line` is their ancestors, themselves and their
+ * descendants; `shown` adds the partners of the person and of their descendants.
+ */
+export function lineage(graph: Graph<PersonLinks>, id: string): { line: Set<string>; shown: Set<string> } {
+  const line = new Set<string>()
+  if (!graph.byId.has(id)) return { line, shown: line }
+  const up = (x: string) => {
+    for (const p of graph.byId.get(x)!.parents) if (graph.byId.has(p) && !line.has(p)) (line.add(p), up(p))
+  }
+  const down = (x: string) => {
+    for (const c of graph.children.get(x) ?? []) if (!line.has(c)) (line.add(c), down(c))
+  }
+  // Partners are shown for the person and their descendants, not for ancestors:
+  // an ancestor's other partner is not part of this line.
+  line.add(id)
+  down(id)
+  const shown = new Set(line)
+  for (const x of line) for (const s of graph.spouses.get(x) ?? []) shown.add(s)
+  up(id)
+  for (const x of line) shown.add(x)
+  return { line, shown }
+}
