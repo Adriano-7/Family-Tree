@@ -1,0 +1,27 @@
+// Every piece of interface text lives here. Translate this file to change the language.
+export const strings = {
+  title: 'Family constellation',
+  summary: (people: number, generations: number) =>
+    `${people} ${people === 1 ? 'person' : 'people'} across ${generations} ${generations === 1 ? 'generation' : 'generations'}`,
+  hint: 'Drag to look around, scroll or pinch to zoom, and select someone to read their story.',
+  empty: 'Nobody is here yet. Add a file to content/people to place the first star.',
+  searchLabel: 'Find a person',
+  searchPlaceholder: 'Find a person',
+  searchNoResults: 'Nobody by that name',
+  close: 'Close',
+  bornIn: (place: string) => `born in ${place}`,
+  parents: 'Parents',
+  partner: 'Partner',
+  partners: 'Partners',
+  children: 'Children',
+  siblings: 'Brothers and sisters',
+  photos: 'Photos',
+  openPhoto: 'Open photo',
+  previousPhoto: 'Previous photo',
+  nextPhoto: 'Next photo',
+  legendOldest: 'Oldest generation',
+  legendYoungest: 'youngest',
+  legendParent: 'Parent and child',
+  legendPartner: 'Partners',
+  notFound: 'This person is not in the tree.',
+}
