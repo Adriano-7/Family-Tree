@@ -8,7 +8,7 @@ import Constellation from './scene/Constellation'
 import { computeLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { GenerationFilter, SideFilter } from './ui/Filters'
-import { sideInAddress, sideSlug, useMediaQuery, useSelectedPerson, writeSideToAddress } from './ui/hooks'
+import { readAddress, sideSlug, useMediaQuery, useSelectedPerson, writeAddress } from './ui/hooks'
 import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
 import { kinshipName } from './ui/kinship'
 import { PersonEditor } from './ui/PersonEditor'
@@ -84,22 +84,27 @@ export default function App() {
     return { top, bottom: bar ? window.innerHeight - bar.top : 0 }
   }, [])
 
-  // A link to a side of the family (/machado) opens on that side. Applied with the first
-  // people that arrive, in the same update, so the visit starts on the filtered tree.
+  // A shared link (/machado, /linha/rosa, /parentesco/rosa/adriano) opens on what it names.
+  // Applied with the first people that arrive, in the same update, so the visit starts there.
   const addressRead = useRef(false)
   const load = useCallback(() => {
     store.load().then(
       (loaded) => {
         if (!addressRead.current) {
           addressRead.current = true
-          const wanted = sideInAddress()
-          if (wanted) {
+          const wanted = readAddress(window.location.pathname)
+          const known = (id: string) => loaded.some((p) => p.id === id)
+          if (wanted?.kind === 'side') {
             try {
-              const side = familySides(buildGraph(loaded)).find((s) => sideSlug(s.name) === wanted)
+              const side = familySides(buildGraph(loaded)).find((s) => sideSlug(s.name) === wanted.slug)
               if (side) setFilter({ ...NO_FILTER, sides: [side.name] })
             } catch {
               // A tree that cannot be drawn shows nothing anyway.
             }
+          } else if (wanted?.kind === 'line' && known(wanted.id)) {
+            setFocus({ kind: 'line', id: wanted.id })
+          } else if (wanted?.kind === 'relation' && wanted.from !== wanted.to && known(wanted.from) && known(wanted.to)) {
+            setFocus({ kind: 'relation', from: wanted.from, to: wanted.to })
           }
         }
         setPeople(loaded)
@@ -213,12 +218,13 @@ export default function App() {
   const filtered = view !== graph
   const homeIds = useMemo(() => (filtered ? [] : [...household(graph, HOME_PERSON)]), [graph, filtered])
 
-  // The chosen side lives in the address too (/machado), so it can be shared; an address that
-  // names no known side is tidied back to /.
+  // What is on show lives in the address too, so it can be shared: a direct line or a
+  // relationship, otherwise the chosen side. An address that names nothing known is tidied back to /.
   const sideName = filter.sides[0] ?? null
   useEffect(() => {
-    if (people !== null) writeSideToAddress(sideName)
-  }, [people, sideName])
+    if (people === null) return
+    writeAddress(focus ?? (sideName ? { kind: 'side', slug: sideSlug(sideName) } : null))
+  }, [people, sideName, focus])
 
   useEffect(() => {
     document.title = selected ? `${selected.name} – ${strings.title}` : strings.title

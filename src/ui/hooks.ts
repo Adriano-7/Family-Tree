@@ -25,18 +25,48 @@ export const sideSlug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
-/** The side of the family named in the address (/machado), if any. */
-export function sideInAddress(): string | null {
-  const first = window.location.pathname.split('/').filter(Boolean)[0]
-  return first ? decodeURIComponent(first).toLowerCase() : null
+/**
+ * What a shareable address shows, besides whoever is open (that part follows the #):
+ *   /machado                      a side of the family
+ *   /linha/rosa-machado           one person's direct line
+ *   /parentesco/rosa/adriano      how two people are related
+ */
+export type AddressView =
+  | { kind: 'side'; slug: string }
+  | { kind: 'line'; id: string }
+  | { kind: 'relation'; from: string; to: string }
+  | null
+
+const LINE = 'linha'
+const RELATION = 'parentesco'
+
+export function readAddress(pathname: string): AddressView {
+  const parts = pathname
+    .split('/')
+    .filter(Boolean)
+    .map((p) => {
+      try {
+        return decodeURIComponent(p).toLowerCase()
+      } catch {
+        return p.toLowerCase()
+      }
+    })
+  if (parts[0] === LINE) return parts[1] ? { kind: 'line', id: parts[1] } : null
+  if (parts[0] === RELATION) return parts[1] && parts[2] ? { kind: 'relation', from: parts[1], to: parts[2] } : null
+  return parts[0] ? { kind: 'side', slug: parts[0] } : null
 }
 
-/**
- * Writes the side of the family into the address (/machado, or / for none) without adding a
- * step to the history. Whoever is open stays in the part after #, so a shared link can carry both.
- */
-export function writeSideToAddress(name: string | null) {
-  const wanted = name ? `/${sideSlug(name)}` : '/'
+export function addressPath(view: AddressView): string {
+  if (!view) return '/'
+  const e = encodeURIComponent
+  if (view.kind === 'line') return `/${LINE}/${e(view.id)}`
+  if (view.kind === 'relation') return `/${RELATION}/${e(view.from)}/${e(view.to)}`
+  return `/${e(view.slug)}`
+}
+
+/** Puts this view in the address without adding a step to the history; whoever is open (after #) stays. */
+export function writeAddress(view: AddressView) {
+  const wanted = addressPath(view)
   if (window.location.pathname === wanted) return
   history.replaceState(history.state, '', wanted + window.location.search + window.location.hash)
 }
