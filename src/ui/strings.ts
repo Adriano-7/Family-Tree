@@ -1,6 +1,6 @@
 // Every piece of interface text lives here. Translate this file to change the language.
 export const strings = {
-  title: 'Famílias Santos e Machado',
+  title: 'Árvore Genealógica',
   empty: 'Ainda não há ninguém. Adicione um ficheiro a content/people para colocar a primeira estrela.',
   searchLabel: 'Procurar uma pessoa',
   searchPlaceholder: 'Procurar',

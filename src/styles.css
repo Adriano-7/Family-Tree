@@ -276,6 +276,31 @@ button {
   opacity: 0.7;
 }
 
+/* The sides of the family, under the search: a row of small glass pills that wraps as more are added. */
+.masthead .sides {
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.masthead .sides button {
+  padding: 0.3rem 0.85rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: rgb(22 22 24 / 0.62);
+  backdrop-filter: blur(22px) saturate(1.5);
+  color: var(--haze);
+  font-size: 0.85rem;
+}
+
+.masthead .sides button[aria-pressed='true'] {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: #000;
+}
+
 .generations {
   gap: 0.35rem;
   cursor: pointer;

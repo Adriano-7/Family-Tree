@@ -7,7 +7,7 @@ import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
 import { computeLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
-import { Filters } from './ui/Filters'
+import { GenerationFilter, SideFilter } from './ui/Filters'
 import { useMediaQuery, useSelectedPerson } from './ui/hooks'
 import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
 import { PersonEditor } from './ui/PersonEditor'
@@ -181,6 +181,7 @@ export default function App() {
           <p>{people === null ? (loadFailed ? strings.loadFailed : strings.loading) : strings.empty}</p>
         )}
         {count > 0 && <Search people={graph.people} onSelect={(id) => !editing && select(id)} />}
+        {count > 0 && <SideFilter sides={sides} filter={filter} onChange={changeFilter} />}
         {trialChanges && (
           <p className="trial">
             {strings.trialNotice}
@@ -232,7 +233,7 @@ export default function App() {
               >
                 <WholeTreeIcon />
               </button>
-              <Filters sides={sides} generationCount={graph.generationCount} filter={filter} onChange={changeFilter} />
+              <GenerationFilter generationCount={graph.generationCount} filter={filter} onChange={changeFilter} />
             </>
           )}
           <button
