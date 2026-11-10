@@ -412,11 +412,17 @@ export default function App() {
             onEdit={() => setEditing({ person: selected })}
             onAdd={startAdd}
             sides={sides.filter((s) => s.line.has(selected.id)).map((s) => s.name)}
-            onShowSide={(name) => changeFilter({ ...filter, sides: [name] })}
+            onShowSide={(name) => {
+              changeFilter({ ...filter, sides: [name] })
+              // On a narrow screen the panel covers the tree: close it so the change can be seen.
+              if (!wide) select(null)
+            }}
             onShowLine={() => {
               setFilter(NO_FILTER)
               setRelatingFrom(null)
               setFocus({ kind: 'line', id: selected.id })
+              // Close the panel, so the camera takes in the whole line (and, on a phone, it can be seen at all).
+              select(null)
             }}
             onRelate={() => {
               setFocus(null)
