@@ -29,7 +29,7 @@ const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><r
 describe('build-content', () => {
   it('builds people, text and photos', () => {
     const r = build({
-      'people/ana.md': '---\nname: Ana\nborn: 1938-04-12\ndied: 2015\nportrait: me.svg\ngallery:\n  - file: me.svg\n    caption: Hello\n---\n\nSome *text*.',
+      'people/ana.md': '---\nname: Ana\nborn: 1938-04-12\ndied: 2015\nportrait: me.svg\ngallery:\n  - file: me.svg\n    caption: Hello\n    with: [rui]\n---\n\nSome *text*.',
       'people/rui.md': '---\nname: Rui\nparents: [ana]\nfamilies: [Santos]\nseparated: [ana]\n---\n',
       'photos/ana/me.svg': svg,
     })
@@ -37,7 +37,7 @@ describe('build-content', () => {
     const ana = r.people.find((p: { id: string }) => p.id === 'ana')
     expect(ana).toMatchObject({ name: 'Ana', born: '1938-04-12', died: '2015', thumb: 'photos/ana/_thumb.webp' })
     expect(ana.bio).toBe('Some *text*.')
-    expect(ana.gallery[0]).toMatchObject({ src: 'photos/ana/me.webp', caption: 'Hello', width: 400, height: 600 })
+    expect(ana.gallery[0]).toMatchObject({ src: 'photos/ana/me.webp', caption: 'Hello', width: 400, height: 600, with: ['rui'] })
     expect(fs.existsSync(path.join(r.photos, 'ana', '_thumb.webp'))).toBe(true)
     expect(r.people.find((p: { id: string }) => p.id === 'rui').parents).toEqual(['ana'])
     expect(r.people.find((p: { id: string }) => p.id === 'rui').families).toEqual(['Santos'])

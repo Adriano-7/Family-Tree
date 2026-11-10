@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GalleryImage } from '../data/types'
+import { type PersonPhoto, peopleIn } from '../data/photos'
+import { personHref } from './hooks'
 import { asset } from './format'
 import { strings } from './strings'
 
-export function Gallery({ images }: { images: GalleryImage[] }) {
+export function Gallery({ images, nameOf }: { images: PersonPhoto[]; nameOf: (id: string) => string }) {
   const [index, setIndex] = useState<number | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   const current = index === null ? null : images[index]
@@ -21,7 +22,7 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
     <>
       <ul className="gallery">
         {images.map((img, i) => (
-          <li key={img.src}>
+          <li key={`${img.owner}:${img.src}`}>
             <button type="button" onClick={() => setIndex(i)} aria-label={`${strings.openPhoto}: ${img.caption || i + 1}`}>
               <img src={asset(img.src)} alt={img.caption} width={img.width} height={img.height} loading="lazy" />
             </button>
@@ -33,7 +34,8 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
         ref={dialog}
         className="lightbox"
         onClose={() => setIndex(null)}
-        onClick={(e) => e.target === e.currentTarget && setIndex(null)}
+        // A click on the dark space around the photo closes it.
+        onClick={(e) => (e.target === e.currentTarget || (e.target as Element).tagName === 'FIGURE') && setIndex(null)}
         onKeyDown={(e) => {
           // Keep Escape from also closing the person panel behind the photo.
           if (e.key === 'Escape') e.stopPropagation()
@@ -44,6 +46,19 @@ export function Gallery({ images }: { images: GalleryImage[] }) {
         {current && (
           <figure>
             <img src={asset(current.src)} alt={current.caption} width={current.width} height={current.height} />
+            {peopleIn(current).length > 1 && (
+              <p className="in-photo">
+                {strings.inPhoto}:{' '}
+                {peopleIn(current).map((id, i) => (
+                  <span key={id}>
+                    {i > 0 && ', '}
+                    <a href={personHref(id)} onClick={() => setIndex(null)}>
+                      {nameOf(id)}
+                    </a>
+                  </span>
+                ))}
+              </p>
+            )}
             <figcaption>
               {images.length > 1 && (
                 <button type="button" onClick={() => step(-1)} aria-label={strings.previousPhoto}>

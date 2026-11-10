@@ -28,6 +28,8 @@ interface Photo {
   caption: string
   width: number
   height: number
+  /** Other people who appear in it. */
+  with: string[]
 }
 
 let photoKey = 0
@@ -52,7 +54,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
   // `undefined`: keep what is stored. `null`: removed. Otherwise a newly picked photo.
   const [portrait, setPortrait] = useState<{ thumb: Blob; full: Blob; preview: string } | null | undefined>(undefined)
   const [photos, setPhotos] = useState<Photo[]>(() =>
-    person.gallery.map((g) => ({ key: `p${photoKey++}`, src: g.src, caption: g.caption, width: g.width, height: g.height })),
+    person.gallery.map((g) => ({ key: `p${photoKey++}`, src: g.src, caption: g.caption, width: g.width, height: g.height, with: g.with ?? [] })),
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -105,7 +107,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
       const prepared = await Promise.all([...files].map((f) => prepareImage(f, 1600, 1600)))
       setPhotos((list) => [
         ...list,
-        ...prepared.map((p) => ({ key: `p${photoKey++}`, src: preview(p.blob), blob: p.blob, caption: '', width: p.width, height: p.height })),
+        ...prepared.map((p) => ({ key: `p${photoKey++}`, src: preview(p.blob), blob: p.blob, caption: '', width: p.width, height: p.height, with: [] })),
       ])
     } catch {
       setError(strings.errorPhoto)
@@ -133,6 +135,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
           caption: p.caption.trim(),
           width: p.width,
           height: p.height,
+          ...(p.with.length ? { with: p.with } : {}),
         })),
       )
       await onSave({
@@ -310,6 +313,14 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
                   <button type="button" className="quiet" onClick={() => setPhotos((list) => list.filter((x) => x.key !== p.key))}>
                     {strings.removePhoto}
                   </button>
+                  <div className="photo-with">
+                    <PeoplePicker
+                      label={strings.photoWith}
+                      candidates={partnerCandidates}
+                      value={p.with}
+                      onChange={(ids) => setPhotos((list) => list.map((x) => (x.key === p.key ? { ...x, with: ids } : x)))}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

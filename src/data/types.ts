@@ -3,6 +3,8 @@ export interface GalleryImage {
   caption: string
   width: number
   height: number
+  /** Other people who appear in it: it shows in their photos too, without uploading it again. */
+  with?: string[]
 }
 
 export interface Person {

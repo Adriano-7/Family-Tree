@@ -73,6 +73,7 @@ export function savePerson(people: Person[], person: Person): EditResult {
     // Only somebody who is (or was) a partner can be separated from.
     separated: [...new Set(person.separated ?? [])].filter((s) => s !== person.id && person.spouses.includes(s)),
     families: cleanFamilies(person.families),
+    gallery: person.gallery.map((g) => ({ ...g, with: [...new Set(g.with ?? [])].filter((x) => x !== person.id) })),
   }
   if (!clean.name) throw new EditError('name')
   if ([clean.born, clean.died].some((d) => d && !DATE_PATTERN.test(d))) throw new EditError('date')
@@ -109,12 +110,15 @@ export function deletePerson(people: Person[], id: string): EditResult {
   const next = people
     .filter((p) => p.id !== id)
     .map((other) => {
-      if (!other.parents.includes(id) && !other.spouses.includes(id) && !(other.separated ?? []).includes(id)) return other
+      const inPhotos = other.gallery.some((g) => g.with?.includes(id))
+      if (!other.parents.includes(id) && !other.spouses.includes(id) && !(other.separated ?? []).includes(id) && !inPhotos)
+        return other
       const updated = {
         ...other,
         parents: other.parents.filter((p) => p !== id),
         spouses: other.spouses.filter((s) => s !== id),
         separated: (other.separated ?? []).filter((s) => s !== id),
+        gallery: inPhotos ? other.gallery.map((g) => (g.with ? { ...g, with: g.with.filter((x) => x !== id) } : g)) : other.gallery,
       }
       changed.push(updated)
       return updated

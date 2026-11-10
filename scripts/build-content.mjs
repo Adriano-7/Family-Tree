@@ -81,7 +81,8 @@ for (const file of files) {
   const gallery = []
   for (const g of Array.isArray(d.gallery) ? d.gallery : d.gallery ? [d.gallery] : []) {
     if (typeof g === 'string') gallery.push({ file: g, caption: '' })
-    else if (g && typeof g.file === 'string') gallery.push({ file: g.file, caption: String(g.caption ?? '') })
+    else if (g && typeof g.file === 'string')
+      gallery.push({ file: g.file, caption: String(g.caption ?? ''), with: idList(g.with, 'gallery with', label) })
     else fail(label, 'each gallery entry needs a "file"')
   }
   raw.push({
@@ -105,6 +106,10 @@ for (const file of files) {
 
 const byId = new Map(raw.map((p) => [p.id, p]))
 for (const p of raw) {
+  // Other people tagged in a photo must exist too.
+  for (const g of p.gallery)
+    for (const other of g.with ?? [])
+      if (!byId.has(other)) fail(p.label, `a photo's "with" mentions "${other}", but content/people/${other}.md does not exist`)
   for (const field of ['parents', 'spouses', 'separated']) {
     for (const other of p[field]) {
       if (other === p.id) fail(p.label, `lists themselves in "${field}"`)
@@ -184,7 +189,7 @@ for (const p of raw) {
       const name = `${stem(g.file)}.webp`
       const size = await render(srcOf(g.file), path.join(outPhotos, p.id, name), (img) =>
         img.resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }))
-      person.gallery.push({ src: `photos/${p.id}/${name}`, caption: g.caption, ...size })
+      person.gallery.push({ src: `photos/${p.id}/${name}`, caption: g.caption, ...size, ...(g.with?.length ? { with: g.with } : {}) })
     }
   } catch (e) {
     fail(p.label, `a photo could not be processed (${e.message})`)

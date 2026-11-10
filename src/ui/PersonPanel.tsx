@@ -6,6 +6,7 @@ import { initialsOf } from '../scene/textures'
 import { asset, lifeDates, lifeYears } from './format'
 import { renderBio } from './bio'
 import { AddRelative } from './AddRelative'
+import { photosOf } from '../data/photos'
 import { Gallery } from './Gallery'
 import { personHref } from './hooks'
 import { strings } from './strings'
@@ -85,6 +86,7 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
   const [adding, setAdding] = useState<Relative | null>(null)
   useEffect(() => setAdding(null), [person.id])
   const candidates = useMemo(() => (adding ? linkCandidates(graph, person.id, adding) : []), [graph, person.id, adding])
+  const photos = useMemo(() => photosOf(graph.people, person.id), [graph.people, person.id])
   const dates = lifeDates(person)
   const partners = graph.spouses.get(person.id) ?? []
   const parentCount = person.parents.filter((p) => graph.byId.has(p)).length
@@ -120,10 +122,10 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
           </button>
         </div>
         {person.bio && <div className="story" dangerouslySetInnerHTML={{ __html: renderBio(person.bio) }} />}
-        {person.gallery.length > 0 && (
+        {photos.length > 0 && (
           <section>
             <h3>{strings.photos}</h3>
-            <Gallery key={person.id} images={person.gallery} />
+            <Gallery key={person.id} images={photos} nameOf={(id) => graph.byId.get(id)?.name ?? ''} />
           </section>
         )}
         <Relatives title={strings.parents} ids={person.parents} graph={graph} />

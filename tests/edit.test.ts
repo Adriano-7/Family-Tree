@@ -129,3 +129,30 @@ describe('linking somebody already in the tree', () => {
     expect(result.people.find((p) => p.id === 'alexandra')).toMatchObject({ spouses: ['eliseu'], separated: ['eliseu'] })
   })
 })
+
+describe('photos shared between people', () => {
+  const photo = (src: string, withIds?: string[]) => ({ src, caption: '', width: 1, height: 1, ...(withIds ? { with: withIds } : {}) })
+
+  it('shows a photo to everybody tagged in it', async () => {
+    const { photosOf, peopleIn } = await import('../src/data/photos')
+    const people = [
+      person('ana', { gallery: [photo('a.webp', ['rui', 'eva']), photo('b.webp')] }),
+      person('rui', { gallery: [photo('r.webp')] }),
+      person('eva'),
+    ]
+    expect(photosOf(people, 'rui').map((p) => [p.owner, p.src])).toEqual([
+      ['rui', 'r.webp'],
+      ['ana', 'a.webp'],
+    ])
+    expect(photosOf(people, 'eva').map((p) => p.src)).toEqual(['a.webp'])
+    expect(peopleIn(photosOf(people, 'eva')[0])).toEqual(['ana', 'rui', 'eva'])
+  })
+
+  it('tidies the tags, and forgets a deleted person in them', () => {
+    const saved = savePerson([], person('ana', { gallery: [photo('a.webp', ['rui', 'rui', 'ana'])] }))
+    expect(saved.people[0].gallery[0].with).toEqual(['rui'])
+    const { people, changed } = deletePerson([person('ana', { gallery: [photo('a.webp', ['rui'])] }), person('rui')], 'rui')
+    expect(people[0].gallery[0].with).toEqual([])
+    expect(changed.map((p) => p.id)).toEqual(['ana'])
+  })
+})

@@ -73,6 +73,8 @@ export const strings = {
   fieldPhotos: 'Mais fotografias',
   addPhotos: 'Adicionar fotografias',
   caption: 'Legenda',
+  photoWith: 'Quem mais aparece',
+  inPhoto: 'Na fotografia',
   removePhoto: 'Remover',
   fieldParents: 'Pais',
   fieldPartners: 'Companheiros(as)',
