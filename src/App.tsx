@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deletePerson, emptyPerson, savePerson } from './data/edit'
 import { HOME_PERSON } from './config'
-import { buildGraph, familySides, type Filter, household, lineage, relation, visiblePeople } from './data/graph'
+import { buildGraph, familySides, type Filter, household, lineage, relation, relatives, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
@@ -121,14 +121,19 @@ export default function App() {
     [graph, focus],
   )
   // Who is on show: the focus if there is one, otherwise what the filters leave.
+  // While choosing the second person, only the first one's relatives (and partners) can be chosen.
+  const relatable = useMemo(() => (relatingFrom ? relatives(graph, relatingFrom) : null), [graph, relatingFrom])
+  // Who is on show: while choosing, the first person and their relatives; then the focus if
+  // there is one; otherwise what the filters leave.
   const visible = useMemo(() => {
+    if (relatingFrom && relatable) return new Set([relatingFrom, ...relatable])
     if (focus?.kind === 'line') {
       const { shown } = lineage(graph, focus.id)
       if (shown.size) return shown
     }
     if (related) return related.people
     return visiblePeople(graph, filter)
-  }, [graph, filter, focus, related])
+  }, [graph, filter, focus, related, relatingFrom, relatable])
   // Somebody opened from outside it (a search, a link) is shown anyway.
   const selectedOutside = !!selected && !!visible && !visible.has(selected.id)
   useEffect(() => {
@@ -154,9 +159,19 @@ export default function App() {
     setFocus(null)
     setRelatingFrom(null)
   }
+  const searchable = useMemo(
+    () => (relatable ? graph.people.filter((p) => relatable.has(p.id)) : graph.people),
+    [graph, relatable],
+  )
+  // Likewise the family sides: only those the first person belongs to.
+  const choosableSides = useMemo(
+    () => (relatingFrom ? sides.filter((side) => side.line.has(relatingFrom)) : sides),
+    [sides, relatingFrom],
+  )
   /** A person was clicked or found: open them, or make them the second of the two being compared. */
   const pick = (id: string) => {
     if (editing) return
+    if (relatable && !relatable.has(id) && id !== relatingFrom) return
     if (!relatingFrom || relatingFrom === id) return select(id)
     setFilter(NO_FILTER)
     setFocus({ kind: 'relation', from: relatingFrom, to: id })
@@ -230,7 +245,7 @@ export default function App() {
           overviewRequest={overviewRequest}
           homeIds={homeIds}
           homeRequest={homeRequest}
-          filterKey={JSON.stringify([filter, focus])}
+          filterKey={JSON.stringify([filter, focus, relatingFrom])}
           generation={graph.generation}
           generationCount={graph.generationCount}
           inset={inset}
@@ -247,8 +262,8 @@ export default function App() {
         {count === 0 && (
           <p>{people === null ? (loadFailed ? strings.loadFailed : strings.loading) : strings.empty}</p>
         )}
-        {count > 0 && <Search people={graph.people} onSelect={pick} />}
-        {count > 0 && <SideFilter sides={sides} filter={filter} onChange={changeFilter} />}
+        {count > 0 && <Search people={searchable} onSelect={pick} />}
+        {count > 0 && <SideFilter sides={choosableSides} filter={filter} onChange={changeFilter} />}
         {(focus || relatingFrom) && (
           <div className="focus" role="status">
             <span>

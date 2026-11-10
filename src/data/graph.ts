@@ -240,3 +240,25 @@ export function relation(graph: Graph<PersonLinks>, from: string, to: string): R
   const blood = !steps.includes('partner') && turns <= 1 && (up === 0 || down === 0 || steps[0] === 'up')
   return { people, steps: blood ? { up, down, half } : null, partners: steps.length === 1 && steps[0] === 'partner' }
 }
+
+/**
+ * Who counts as related to this person: blood relatives (anybody who shares an
+ * ancestor with them) and their partners; not their partner's own family. Not
+ * including the person.
+ */
+export function relatives(graph: Graph<PersonLinks>, id: string): Set<string> {
+  const out = new Set<string>()
+  if (!graph.byId.has(id)) return out
+  const ancestors = new Set([id])
+  const up = (x: string) => {
+    for (const p of graph.byId.get(x)!.parents) if (graph.byId.has(p) && !ancestors.has(p)) (ancestors.add(p), up(p))
+  }
+  up(id)
+  const down = (x: string) => {
+    for (const c of graph.children.get(x) ?? []) if (!out.has(c)) (out.add(c), down(c))
+  }
+  for (const a of ancestors) (out.add(a), down(a))
+  for (const s of graph.spouses.get(id) ?? []) out.add(s)
+  out.delete(id)
+  return out
+}

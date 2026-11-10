@@ -105,6 +105,8 @@ button {
 
 .search {
   position: relative;
+  /* Above the family pills and the focus chip beneath it, so the results list covers them. */
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 0.5rem;

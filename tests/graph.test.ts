@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, relation, siblings, visiblePeople } from '../src/data/graph'
+import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
 import { computeLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -232,5 +232,22 @@ describe('family sides and filters', () => {
   it('tells half brothers and sisters apart', () => {
     const g = buildGraph([person('p'), person('q'), person('r'), person('a', ['p', 'q']), person('b', ['p', 'r'])])
     expect(relation(g, 'a', 'b')!.steps).toEqual({ up: 1, down: 1, half: true })
+  })
+
+  it('lists a person\'s relatives: blood relatives and partners, not in-laws', () => {
+    const g = buildGraph([...people(), person('stranger'), person('stranger-kid', ['stranger'])])
+    const mine = relatives(g, 'me')
+    expect(mine.has('me')).toBe(false)
+    // Mum's side and dad's side, uncle and aunt, brother and child.
+    for (const id of ['mum', 'dad', 'grandpa', 'grandma', 'nonno', 'uncle', 'aunt', 'brother', 'kid']) expect(mine.has(id)).toBe(true)
+    // The uncle's partner married in: not a relative of mine.
+    expect(mine.has('in-law')).toBe(false)
+    expect(mine.has('stranger')).toBe(false)
+    // A partner is a relative, but their own family is not.
+    const mum = relatives(g, 'mum')
+    expect(mum.has('dad')).toBe(true)
+    expect(mum.has('nonno')).toBe(false)
+    expect(mum.has('aunt')).toBe(false)
+    expect(relatives(g, 'nobody').size).toBe(0)
   })
 })
