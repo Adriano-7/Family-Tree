@@ -1,8 +1,0 @@
-// Cloudflare: publish the built site (the dist folder) as static files.
-{
-  "name": "family-tree",
-  "compatibility_date": "2026-01-01",
-  "assets": {
-    "directory": "./dist"
-  }
-}
