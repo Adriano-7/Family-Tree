@@ -50,17 +50,38 @@ export function buildGraph<T extends PersonLinks>(people: T[]): Graph<T> {
   assertNoAncestorLoop(people, byId)
 
   // A child sits one layer below their lowest parent; partners share a layer.
-  const generation = new Map<string, number>(people.map((p) => [p.id, 0]))
-  for (let pass = 0, changed = true; changed && pass <= people.length + 1; pass++) {
-    changed = false
-    for (const p of people) {
-      let g = 0
-      for (const parent of p.parents) if (byId.has(parent)) g = Math.max(g, generation.get(parent)! + 1)
-      for (const s of spouses.get(p.id)!) g = Math.max(g, generation.get(s)!)
-      if (g > generation.get(p.id)!) {
-        generation.set(p.id, g)
-        changed = true
+  let generation = new Map<string, number>(people.map((p) => [p.id, 0]))
+  const settle = () => {
+    for (let pass = 0, changed = true; changed && pass <= people.length + 1; pass++) {
+      changed = false
+      for (const p of people) {
+        let g = generation.get(p.id)!
+        for (const parent of p.parents) if (byId.has(parent)) g = Math.max(g, generation.get(parent)! + 1)
+        for (const s of spouses.get(p.id)!) g = Math.max(g, generation.get(s)!)
+        if (g > generation.get(p.id)!) {
+          generation.set(p.id, g)
+          changed = true
+        }
       }
+    }
+  }
+  settle()
+  // Brothers and sisters share a layer too: when one of them sits lower (their partner's line has
+  // more generations above it), the parents come down to stand right above that child, and the
+  // rest of their branch follows. Left alone where that cannot work out (say, an uncle married to
+  // his niece's sister-in-law).
+  for (let round = 0, moved = true; moved && round <= people.length; round++) {
+    moved = false
+    for (const p of people) {
+      const kids = children.get(p.id)!
+      if (!kids.length) continue
+      const target = Math.max(...kids.map((c) => generation.get(c)!)) - 1
+      if (target <= generation.get(p.id)!) continue
+      const before = new Map(generation)
+      generation.set(p.id, target)
+      settle()
+      if (kids.every((c) => generation.get(c) === target + 1)) moved = true
+      else generation = before
     }
   }
   const generationCount = people.length ? Math.max(...generation.values()) + 1 : 0

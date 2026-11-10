@@ -65,6 +65,47 @@ describe('lineage', () => {
 })
 
 describe('computeLayout', () => {
+  it('draws the line to a child who sits in another branch at right angles', () => {
+    const g = buildGraph([
+      person('herMum', [], ['herDad']),
+      person('herDad'),
+      person('her', ['herMum', 'herDad'], ['him']),
+      person('firstMum'),
+      person('first', ['firstMum'], ['him']),
+      person('firstSister', ['firstMum']),
+      person('hisDad', [], ['hisMum']),
+      person('hisMum'),
+      person('him', ['hisDad', 'hisMum']),
+      person('hisBrother', ['hisDad', 'hisMum']),
+      person('a', ['him', 'first']),
+      person('b', ['him', 'her']),
+    ])
+    const far = computeLayout(g).segments.filter((s) => s.far)
+    expect(far.length).toBe(3)
+    for (const s of far) expect(s.a[0] === s.b[0] || s.a[1] === s.b[1]).toBe(true)
+  })
+
+  it('keeps brothers and sisters on one row when a partner has more generations above', () => {
+    const g = buildGraph([
+      person('great', [], []),
+      person('herMum', ['great'], ['herDad']),
+      person('herDad'),
+      person('her', ['herMum', 'herDad'], ['him']),
+      person('hisDad', [], ['hisMum']),
+      person('hisMum'),
+      person('him', ['hisDad', 'hisMum']),
+      person('hisBrother', ['hisDad', 'hisMum']),
+      person('nephew', ['hisBrother']),
+    ])
+    expect(g.generation.get('him')).toBe(2)
+    expect(g.generation.get('hisBrother')).toBe(2)
+    expect(g.generation.get('hisDad')).toBe(1)
+    expect(g.generation.get('hisMum')).toBe(1)
+    expect(g.generation.get('nephew')).toBe(3)
+    // No line cuts across the chart at an angle.
+    for (const s of computeLayout(g).segments) expect(s.a[0] === s.b[0] || s.a[1] === s.b[1]).toBe(true)
+  })
+
   const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 
   it('is the same on every run', () => {

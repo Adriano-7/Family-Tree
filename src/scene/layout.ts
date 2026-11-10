@@ -30,6 +30,7 @@ const UNIT_GAP = 1.4 // extra room between neighbouring households
 const TREE_GAP = 5 // between unrelated family trees
 const GROUP_GAP = 3.5 // between the children of one partner and the children of another
 const BUS_LIFT = 0.9 // row lines of a third, fourth... partner's children run at their own height
+const FAR_STEP = 0.5 // between the lines to children who sit in another branch, above one row
 
 /** Partners (and people who share a child) placed side by side. */
 interface Unit {
@@ -176,7 +177,7 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
   // Which tree stands where decides who can stand next to their own parents, so the order is
   // tried out: starting from the one above, a tree moves wherever the lines come out cleaner.
   const original = new Map(units.map((u) => [u, { members: [...u.members], children: [...u.children] }]))
-  const arrange = (row: number[]): Arrangement => {
+  const arrangeOnce = (row: number[], loose: Set<string>): Arrangement => {
     for (const unit of units) {
       unit.members = [...original.get(unit)!.members]
       unit.children = [...original.get(unit)!.children]
@@ -188,6 +189,7 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
     for (const [child, parentTree] of crossing) {
       const unit = unitOf.get(child)!
       const side = Math.sign(rank.get(parentTree)! - rank.get(unit.tree)!)
+      if (loose.has(child)) continue
       for (let u: Unit | null = unit; u; u = u.parent) u.lean += side
       // Inside the couple, the partner from the other tree stands on that tree's side.
       unit.members = unit.members.filter((m) => m !== child)
@@ -318,6 +320,7 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
       down: Math.min(...children.map((c) => flat.get(c)![1])),
     }))
 
+    const farLanes = new Map<number, number>() // row -> lines to far children running above it
     for (const { parents, children } of families.values()) {
       const anchor = anchorOf(parents)
       const home = unitOf.get(parents[0])!
@@ -351,8 +354,22 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
       local.sort((a, b) => flat.get(a)![0] - flat.get(b)![0])
 
       for (const child of children.filter((c) => !local.includes(c))) {
-        line(anchor, flat.get(child)!, { kind: 'descent', far: true, parents, children: [child] })
-        cost += 1000
+        const [u, y] = flat.get(child)!
+        const info = { kind: 'descent' as const, far: true, parents, children: [child] }
+        // A shorter way across is better: it passes over fewer of the other branches.
+        cost += 1000 + Math.abs(u - anchor[0])
+        if (y >= anchor[1]) {
+          line(anchor, [u, y], info)
+          continue
+        }
+        // Down from the parents, along the child's row a little above the other row lines (each
+        // such line at its own height, so two never run into one), then down to the child.
+        const lanes = farLanes.get(y) ?? 0
+        farLanes.set(y, lanes + 1)
+        const laneY = Math.min(y + LAYER_GAP / 2 + BUS_LIFT + lanes * FAR_STEP, anchor[1])
+        line(anchor, [anchor[0], laneY], info)
+        line([anchor[0], laneY], [u, laneY], info)
+        line([u, laneY], [u, y], info)
       }
       if (!local.length) continue
 
@@ -380,6 +397,19 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
           })
 
     return { flat, segments, width, cost }
+  }
+  // A branch leans towards the tree one of its people comes from, to stand next to it. When that
+  // person ends up with a long line across the chart anyway, the leaning only got in the way of
+  // the others in the branch: try again without it, for each such person and for all of them.
+  const arrange = (row: number[]): Arrangement => {
+    let best = arrangeOnce(row, new Set())
+    const far = [...new Set(best.segments.filter((s) => s.far).flatMap((s) => s.children))]
+    const tries = far.length > 1 ? [far, ...far.map((id) => [id])] : far.length ? [far] : []
+    for (const loose of tries) {
+      const tried = arrangeOnce(row, new Set(loose))
+      if (tried.cost < best.cost - 1e-6) best = tried
+    }
+    return best
   }
 
   let best = arrange(firstRow)
