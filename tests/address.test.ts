@@ -13,7 +13,8 @@ describe('shareable addresses', () => {
   it('reads a side, a direct line and a relationship', () => {
     expect(readAddress('/')).toBeNull()
     expect(readAddress('/Machado/')).toEqual({ kind: 'side', slug: 'machado' })
-    expect(readAddress('/linha/rosa-machado')).toEqual({ kind: 'line', id: 'rosa-machado' })
+    expect(readAddress('/linhagem/rosa-machado')).toEqual({ kind: 'line', id: 'rosa-machado' })
+    expect(readAddress('/familia/rosa-machado')).toEqual({ kind: 'family', id: 'rosa-machado' })
     expect(readAddress('/parentesco/rosa-machado/adriano-alexandre-machado/')).toEqual({
       kind: 'relation',
       from: 'rosa-machado',
@@ -22,12 +23,12 @@ describe('shareable addresses', () => {
   })
 
   it('ignores an unfinished line or relationship', () => {
-    expect(readAddress('/linha')).toBeNull()
+    expect(readAddress('/linhagem')).toBeNull()
     expect(readAddress('/parentesco/rosa-machado')).toBeNull()
   })
 
   it('writes back what it reads', () => {
-    for (const path of ['/', '/machado', '/linha/rosa-machado', '/parentesco/rosa-machado/adriano-alexandre-machado'])
+    for (const path of ['/', '/machado', '/linhagem/rosa-machado', '/familia/rosa-machado', '/parentesco/rosa-machado/adriano-alexandre-machado'])
       expect(addressPath(readAddress(path))).toBe(path)
   })
 })

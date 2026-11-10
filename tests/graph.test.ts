@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, generationsBetween, partnershipEnd, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
+import { buildGraph, closeFamily, connected, familySides, household, lineage, generationsBetween, partnershipEnd, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
 import { computeLayout, cropLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -310,6 +310,19 @@ describe('family sides and filters', () => {
     expect(mum.has('nonno')).toBe(false)
     expect(mum.has('aunt')).toBe(false)
     expect(relatives(g, 'nobody').size).toBe(0)
+  })
+
+  it('shows everybody connected to a person: blood relatives and their partners, not partners\' families', () => {
+    const g = buildGraph([...people(), person('stranger'), person('stranger-kid', ['stranger'])])
+    const mine = connected(g, 'me')
+    for (const id of ['me', 'mum', 'dad', 'grandpa', 'grandma', 'nonno', 'uncle', 'aunt', 'brother', 'kid', 'in-law'])
+      expect(mine.has(id)).toBe(true)
+    expect(mine.has('stranger')).toBe(false)
+    // Mum's partner is shown, his own family is not.
+    const mum = connected(g, 'mum')
+    expect(mum.has('dad')).toBe(true)
+    expect(mum.has('nonno')).toBe(false)
+    expect(connected(g, 'nobody').size).toBe(0)
   })
 
   it('knows how a partnership ended', () => {

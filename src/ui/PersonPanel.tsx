@@ -27,6 +27,8 @@ interface Props {
   onShowLine: () => void
   /** Start choosing a second person, to see how the two are related. */
   onRelate: () => void
+  /** Show everybody connected to this person (a link that can be sent to them). */
+  onShowFamily: () => void
 }
 
 function Relatives({
@@ -69,7 +71,7 @@ function Relatives({
   )
 }
 
-export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sides, onShowSide, onShowLine, onRelate }: Props) {
+export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sides, onShowSide, onShowLine, onRelate, onShowFamily }: Props) {
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -114,7 +116,10 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
           </div>
         )}
         <div className="chips person-views">
-          <button type="button" className="chip" onClick={onShowLine}>
+          <button type="button" className="chip" title={strings.showFamilyHelp} onClick={onShowFamily}>
+            {strings.showFamily}
+          </button>
+          <button type="button" className="chip" title={strings.showLineHelp} onClick={onShowLine}>
             {strings.showLine}
           </button>
           <button type="button" className="chip" onClick={onRelate}>

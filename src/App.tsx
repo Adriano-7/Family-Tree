@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deletePerson, EditError, emptyPerson, linkExisting, type Relative, savePerson, withAllPartners } from './data/edit'
 import { HOME_PERSON } from './config'
-import { buildGraph, familySides, type Filter, household, lineage, pairKey, relation, relatives, visiblePeople } from './data/graph'
+import { buildGraph, connected, familySides, type Filter, household, lineage, pairKey, relation, relatives, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
@@ -19,8 +19,8 @@ import { strings } from './ui/strings'
 const store = createStore()
 const NO_FILTER: Filter = { sides: [], generations: null }
 
-/** A closer look that replaces the filters: one person's direct line, or the way between two people. */
-type Focus = { kind: 'line'; id: string } | { kind: 'relation'; from: string; to: string }
+/** A closer look that replaces the filters: one person's direct line or whole family, or the way between two people. */
+type Focus = { kind: 'line' | 'family'; id: string } | { kind: 'relation'; from: string; to: string }
 
 interface Labels {
   surname: boolean
@@ -84,7 +84,7 @@ export default function App() {
     return { top, bottom: bar ? window.innerHeight - bar.top : 0 }
   }, [])
 
-  // A shared link (/machado, /linha/rosa, /parentesco/rosa/adriano) opens on what it names.
+  // A shared link (/machado, /linhagem/rosa, /familia/rosa, /parentesco/rosa/adriano) opens on what it names.
   // Applied with the first people that arrive, in the same update, so the visit starts there.
   const addressRead = useRef(false)
   const load = useCallback(() => {
@@ -101,8 +101,8 @@ export default function App() {
             } catch {
               // A tree that cannot be drawn shows nothing anyway.
             }
-          } else if (wanted?.kind === 'line' && known(wanted.id)) {
-            setFocus({ kind: 'line', id: wanted.id })
+          } else if ((wanted?.kind === 'line' || wanted?.kind === 'family') && known(wanted.id)) {
+            setFocus({ kind: wanted.kind, id: wanted.id })
           } else if (wanted?.kind === 'relation' && wanted.from !== wanted.to && known(wanted.from) && known(wanted.to)) {
             setFocus({ kind: 'relation', from: wanted.from, to: wanted.to })
           }
@@ -149,6 +149,10 @@ export default function App() {
     if (relatingFrom && relatable) return new Set([relatingFrom, ...relatable])
     if (focus?.kind === 'line') {
       const { shown } = lineage(graph, focus.id)
+      if (shown.size) return shown
+    }
+    if (focus?.kind === 'family') {
+      const shown = connected(graph, focus.id)
       if (shown.size) return shown
     }
     if (related) return related.people
@@ -332,9 +336,11 @@ export default function App() {
             <span>
               {relatingFrom
                 ? `${firstName(relatingFrom)} ↔ ${strings.relationPick}`
-                : focus!.kind === 'line'
-                  ? strings.lineOf(firstName(focus!.id))
-                  : `${firstName(focus!.from)} ↔ ${firstName(focus!.to)}`}
+                : focus?.kind === 'relation'
+                  ? `${firstName(focus.from)} ↔ ${firstName(focus.to)}`
+                  : focus?.kind === 'family'
+                    ? strings.familyOf(firstName(focus.id))
+                    : focus && strings.lineOf(firstName(focus.id))}
               {!relatingFrom && focus?.kind === 'relation' && (
                 <small>
                   {!related ? strings.relationNone : kin && strings.relationIs(firstName(focus.to), kin, firstName(focus.from))}
@@ -479,6 +485,12 @@ export default function App() {
               setRelatingFrom(null)
               setFocus({ kind: 'line', id: selected.id })
               // Close the panel, so the camera takes in the whole line (and, on a phone, it can be seen at all).
+              select(null)
+            }}
+            onShowFamily={() => {
+              setFilter(NO_FILTER)
+              setRelatingFrom(null)
+              setFocus({ kind: 'family', id: selected.id })
               select(null)
             }}
             onRelate={() => {

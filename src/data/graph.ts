@@ -298,6 +298,21 @@ export function relatives(graph: Graph<PersonLinks>, id: string): Set<string> {
 }
 
 /**
+ * Everybody connected to this person, to show them their family: the person, their blood
+ * relatives (anybody who shares an ancestor with them), and the partners of all of those.
+ * Their partners' own families are left out, as with a side of the family.
+ */
+export function connected(graph: Graph<PersonLinks>, id: string): Set<string> {
+  if (!graph.byId.has(id)) return new Set()
+  const blood = relatives(graph, id)
+  for (const s of graph.spouses.get(id) ?? []) blood.delete(s)
+  blood.add(id)
+  const shown = new Set(blood)
+  for (const x of blood) for (const s of graph.spouses.get(x) ?? []) shown.add(s)
+  return shown
+}
+
+/**
  * How a couple's partnership ended, if it did: separated or divorced, or one of them has died
  * and the other lives on. When both have died the couple is simply shown together.
  */

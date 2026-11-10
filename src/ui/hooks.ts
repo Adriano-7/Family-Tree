@@ -28,16 +28,19 @@ export const sideSlug = (name: string) =>
 /**
  * What a shareable address shows, besides whoever is open (that part follows the #):
  *   /machado                      a side of the family
- *   /linha/rosa-machado           one person's direct line
+ *   /linhagem/rosa-machado        one person's direct line
+ *   /familia/rosa-machado         everybody connected to one person
  *   /parentesco/rosa/adriano      how two people are related
  */
 export type AddressView =
   | { kind: 'side'; slug: string }
   | { kind: 'line'; id: string }
+  | { kind: 'family'; id: string }
   | { kind: 'relation'; from: string; to: string }
   | null
 
-const LINE = 'linha'
+const LINE = 'linhagem'
+const FAMILY = 'familia'
 const RELATION = 'parentesco'
 
 export function readAddress(pathname: string): AddressView {
@@ -52,6 +55,7 @@ export function readAddress(pathname: string): AddressView {
       }
     })
   if (parts[0] === LINE) return parts[1] ? { kind: 'line', id: parts[1] } : null
+  if (parts[0] === FAMILY) return parts[1] ? { kind: 'family', id: parts[1] } : null
   if (parts[0] === RELATION) return parts[1] && parts[2] ? { kind: 'relation', from: parts[1], to: parts[2] } : null
   return parts[0] ? { kind: 'side', slug: parts[0] } : null
 }
@@ -60,6 +64,7 @@ export function addressPath(view: AddressView): string {
   if (!view) return '/'
   const e = encodeURIComponent
   if (view.kind === 'line') return `/${LINE}/${e(view.id)}`
+  if (view.kind === 'family') return `/${FAMILY}/${e(view.id)}`
   if (view.kind === 'relation') return `/${RELATION}/${e(view.from)}/${e(view.to)}`
   return `/${e(view.slug)}`
 }
