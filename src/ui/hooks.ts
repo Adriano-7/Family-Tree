@@ -16,6 +16,31 @@ const readSelected = () => {
 
 export const personHref = (id: string) => `#/p/${encodeURIComponent(id)}`
 
+/** "Magalhães" -> "magalhaes": how a side of the family is written in a link (#/magalhaes). */
+export const sideSlug = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+/** The side of the family named in the address (/machado), if any. */
+export function sideInAddress(): string | null {
+  const first = window.location.pathname.split('/').filter(Boolean)[0]
+  return first ? decodeURIComponent(first).toLowerCase() : null
+}
+
+/**
+ * Writes the side of the family into the address (/machado, or / for none) without adding a
+ * step to the history. Whoever is open stays in the part after #, so a shared link can carry both.
+ */
+export function writeSideToAddress(name: string | null) {
+  const wanted = name ? `/${sideSlug(name)}` : '/'
+  if (window.location.pathname === wanted) return
+  history.replaceState(history.state, '', wanted + window.location.search + window.location.hash)
+}
+
 /** The selected person lives in the address (#/p/maria-silva), so it can be shared and Back works. */
 export function useSelectedPerson() {
   const selectedId = useSyncExternalStore(subscribeToLocation, readSelected)

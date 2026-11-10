@@ -8,7 +8,7 @@ import Constellation from './scene/Constellation'
 import { computeLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { GenerationFilter, SideFilter } from './ui/Filters'
-import { useMediaQuery, useSelectedPerson } from './ui/hooks'
+import { sideInAddress, sideSlug, useMediaQuery, useSelectedPerson, writeSideToAddress } from './ui/hooks'
 import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
 import { kinshipName } from './ui/kinship'
 import { PersonEditor } from './ui/PersonEditor'
@@ -84,9 +84,24 @@ export default function App() {
     return { top, bottom: bar ? window.innerHeight - bar.top : 0 }
   }, [])
 
+  // A link to a side of the family (/machado) opens on that side. Applied with the first
+  // people that arrive, in the same update, so the visit starts on the filtered tree.
+  const addressRead = useRef(false)
   const load = useCallback(() => {
     store.load().then(
       (loaded) => {
+        if (!addressRead.current) {
+          addressRead.current = true
+          const wanted = sideInAddress()
+          if (wanted) {
+            try {
+              const side = familySides(buildGraph(loaded)).find((s) => sideSlug(s.name) === wanted)
+              if (side) setFilter({ ...NO_FILTER, sides: [side.name] })
+            } catch {
+              // A tree that cannot be drawn shows nothing anyway.
+            }
+          }
+        }
         setPeople(loaded)
         setLoadFailed(false)
       },
@@ -194,7 +209,16 @@ export default function App() {
     return () => window.removeEventListener('pointerdown', close)
   }, [labelsOpen])
 
-  const homeIds = useMemo(() => [...household(graph, HOME_PERSON)], [graph])
+  // The visit starts on the home household, unless a link asked for a filtered tree: then on all of it.
+  const filtered = view !== graph
+  const homeIds = useMemo(() => (filtered ? [] : [...household(graph, HOME_PERSON)]), [graph, filtered])
+
+  // The chosen side lives in the address too (/machado), so it can be shared; an address that
+  // names no known side is tidied back to /.
+  const sideName = filter.sides[0] ?? null
+  useEffect(() => {
+    if (people !== null) writeSideToAddress(sideName)
+  }, [people, sideName])
 
   useEffect(() => {
     document.title = selected ? `${selected.name} – ${strings.title}` : strings.title

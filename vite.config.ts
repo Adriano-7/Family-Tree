@@ -27,7 +27,9 @@ function contentPlugin(): Plugin {
 }
 
 export default defineConfig({
-  base: './',
+  // Served from the root of the domain: links to a side of the family (/machado) are real
+  // paths, so the page's files must be found from any of them.
+  base: '/',
   plugins: [react(), contentPlugin()],
   test: { include: ['tests/**/*.test.ts'] },
 })

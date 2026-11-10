@@ -73,7 +73,7 @@ Anyone who has the link to the site can change the tree. Two safety nets:
 
 The site is public, so think about what you write for relatives who are alive: a year instead of a full birth date (or no date at all) is usually enough.
 
-`npm run build` creates the finished site in `dist/`. It is plain files and works on any static host (GitHub Pages, Netlify, Cloudflare Pages), including in a sub-folder.
+`npm run build` creates the finished site in `dist/`. It is plain files and works on a static host that serves it from the root of a domain and sends unknown paths to `index.html` (Cloudflare Pages does both by default), because a side of the family has its own address, like `/machado`.
 
 ## Change the wording or language
 
