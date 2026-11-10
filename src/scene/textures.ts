@@ -59,18 +59,19 @@ export function initialsTexture(name: string, tint: THREE.Color) {
 
 export const LABEL_ASPECT = 512 / 80
 
-export function labelTexture(name: string) {
+/** `muted`: smaller and greyer, for the years under a name. */
+export function labelTexture(name: string, muted = false) {
   const [c, ctx] = canvas(512, 80)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  let size = 40
+  let size = muted ? 32 : 40
   do {
     ctx.font = `500 ${size}px ${DISPLAY_FONT}, system-ui, sans-serif`
     size -= 2
   } while (ctx.measureText(name).width > 496 && size > 18)
   ctx.shadowColor = 'rgba(0,0,0,0.95)'
   ctx.shadowBlur = 8
-  ctx.fillStyle = '#f2efe9'
+  ctx.fillStyle = muted ? '#a3a5ad' : '#f2efe9'
   ctx.fillText(name, 256, 42)
   ctx.fillText(name, 256, 42)
   return toTexture(c)

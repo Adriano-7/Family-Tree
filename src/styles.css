@@ -301,6 +301,107 @@ button {
   color: #000;
 }
 
+/* A closer look in progress: whose line, or which two people. */
+.focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.3rem 0.3rem 0.9rem;
+  border-radius: 18px;
+  background: var(--paper);
+  color: #000;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.focus small {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.focus small:empty {
+  display: none;
+}
+
+.focus button {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.1);
+  color: #000;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.focus button:hover {
+  background: rgb(0 0 0 / 0.2);
+}
+
+.dock button.text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.dock button[aria-expanded='true'] {
+  background: var(--wash);
+  color: var(--paper);
+}
+
+/* What to write under each star. */
+.menu {
+  position: absolute;
+  left: 50%;
+  bottom: 4.6rem;
+  z-index: 3;
+  display: grid;
+  min-width: 10rem;
+  padding: 0.35rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  background: rgb(22 22 24 / 0.9);
+  backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.5);
+  transform: translateX(-50%);
+}
+
+.menu button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--paper);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.menu button:hover {
+  background: var(--wash);
+}
+
+.menu button::after {
+  content: '✓';
+  opacity: 0;
+}
+
+.menu button[aria-checked='true']::after {
+  opacity: 1;
+}
+
+.person-views {
+  margin-top: 0.8rem;
+}
+
 .generations {
   gap: 0.35rem;
   cursor: pointer;
@@ -882,7 +983,8 @@ button:disabled {
 
 @media (min-width: 900px) {
   /* Stay in the middle of what the person panel leaves free. */
-  .with-panel .dock {
+  .with-panel .dock,
+  .with-panel .menu {
     left: calc((100% - 27rem) / 2);
   }
 }

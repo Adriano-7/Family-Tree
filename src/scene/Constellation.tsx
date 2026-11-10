@@ -28,6 +28,8 @@ interface Props {
   generationCount: number
   /** Pixels at the top and bottom of the view taken by the controls, which the tree should stay clear of. */
   inset: () => { top: number; bottom: number }
+  /** What is written under each star besides the first name. */
+  labels: { surname: boolean; years: boolean }
 }
 
 const SKY = '#000000'
@@ -58,6 +60,7 @@ function Scene({
   generation,
   generationCount,
   inset,
+  labels,
 }: Props) {
   const controls = useRef<CameraControlsImpl>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
@@ -169,6 +172,8 @@ function Scene({
           active={p.id === focusId}
           onHover={setHoverId}
           onSelect={onSelect}
+          showSurname={labels.surname}
+          showYears={labels.years}
         />
       ))}
       <CameraControls

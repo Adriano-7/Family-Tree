@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deletePerson, emptyPerson, savePerson } from './data/edit'
 import { HOME_PERSON } from './config'
-import { buildGraph, familySides, type Filter, household, visiblePeople } from './data/graph'
+import { buildGraph, familySides, type Filter, household, lineage, relation, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
@@ -10,6 +10,7 @@ import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { GenerationFilter, SideFilter } from './ui/Filters'
 import { useMediaQuery, useSelectedPerson } from './ui/hooks'
 import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
+import { kinshipName } from './ui/kinship'
 import { PersonEditor } from './ui/PersonEditor'
 import { PersonPanel } from './ui/PersonPanel'
 import { Search } from './ui/Search'
@@ -17,6 +18,23 @@ import { strings } from './ui/strings'
 
 const store = createStore()
 const NO_FILTER: Filter = { sides: [], generations: null }
+
+/** A closer look that replaces the filters: one person's direct line, or the way between two people. */
+type Focus = { kind: 'line'; id: string } | { kind: 'relation'; from: string; to: string }
+
+interface Labels {
+  surname: boolean
+  years: boolean
+}
+const LABELS_KEY = 'family-tree-labels'
+function storedLabels(): Labels {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LABELS_KEY) ?? '{}') as Partial<Labels>
+    return { surname: !!saved.surname, years: !!saved.years }
+  } catch {
+    return { surname: false, years: false }
+  }
+}
 
 /** The form that is open: for an existing person, or a new one (empty id). */
 interface Editing {
@@ -47,6 +65,12 @@ export default function App() {
   const [overviewRequest, setOverviewRequest] = useState(0)
   const [homeRequest, setHomeRequest] = useState(0)
   const [filter, setFilter] = useState<Filter>(NO_FILTER)
+  const [focus, setFocus] = useState<Focus | null>(null)
+  /** The first of two people whose relationship is being asked for; the next person picked is the second. */
+  const [relatingFrom, setRelatingFrom] = useState<string | null>(null)
+  const [labels, setLabels] = useState(storedLabels)
+  const [labelsOpen, setLabelsOpen] = useState(false)
+  const labelsMenu = useRef<HTMLDivElement>(null)
   const [selectedId, select] = useSelectedPerson()
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const wide = useMediaQuery('(min-width: 900px)')
@@ -92,27 +116,69 @@ export default function App() {
   const home = graph.byId.get(HOME_PERSON)
   const sides = useMemo(() => familySides(graph), [graph])
 
-  // Somebody opened from outside what the filters show (a search, a link) is shown anyway.
-  const selectedOutside = useMemo(() => {
-    const visible = selected ? visiblePeople(graph, filter) : null
-    return !!selected && !!visible && !visible.has(selected.id)
-  }, [graph, filter, selected])
+  const related = useMemo(
+    () => (focus?.kind === 'relation' ? relation(graph, focus.from, focus.to) : null),
+    [graph, focus],
+  )
+  // Who is on show: the focus if there is one, otherwise what the filters leave.
+  const visible = useMemo(() => {
+    if (focus?.kind === 'line') {
+      const { shown } = lineage(graph, focus.id)
+      if (shown.size) return shown
+    }
+    if (related) return related.people
+    return visiblePeople(graph, filter)
+  }, [graph, filter, focus, related])
+  // Somebody opened from outside it (a search, a link) is shown anyway.
+  const selectedOutside = !!selected && !!visible && !visible.has(selected.id)
   useEffect(() => {
-    if (selectedOutside) setFilter(NO_FILTER)
+    if (!selectedOutside) return
+    setFilter(NO_FILTER)
+    setFocus(null)
   }, [selectedOutside])
-  const view = useMemo(() => {
-    const visible = visiblePeople(graph, selectedOutside ? NO_FILTER : filter)
-    return visible ? buildGraph(graph.people.filter((p) => visible.has(p.id))) : graph
-  }, [graph, filter, selectedOutside])
+  const view = useMemo(
+    () => (visible && !selectedOutside ? buildGraph(graph.people.filter((p) => visible.has(p.id))) : graph),
+    [graph, visible, selectedOutside],
+  )
   const layout = useMemo(() => computeLayout(view), [view])
   // Choosing a filter that hides the open person closes that person, so the choice is not undone.
   const changeFilter = (next: Filter) => {
     if (selected && !editing) {
-      const visible = visiblePeople(graph, next)
-      if (visible && !visible.has(selected.id)) select(null)
+      const shown = visiblePeople(graph, next)
+      if (shown && !shown.has(selected.id)) select(null)
     }
+    setFocus(null)
     setFilter(next)
   }
+  const clearFocus = () => {
+    setFocus(null)
+    setRelatingFrom(null)
+  }
+  /** A person was clicked or found: open them, or make them the second of the two being compared. */
+  const pick = (id: string) => {
+    if (editing) return
+    if (!relatingFrom || relatingFrom === id) return select(id)
+    setFilter(NO_FILTER)
+    setFocus({ kind: 'relation', from: relatingFrom, to: id })
+    setRelatingFrom(null)
+  }
+  const firstName = (id: string) => graph.byId.get(id)?.name.split(' ')[0] ?? ''
+  const kin = related && kinshipName(related)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LABELS_KEY, JSON.stringify(labels))
+    } catch {
+      // Without storage the choice simply lasts for this visit.
+    }
+  }, [labels])
+  useEffect(() => {
+    if (!labelsOpen) return
+    const close = (e: PointerEvent) => !labelsMenu.current?.contains(e.target as Node) && setLabelsOpen(false)
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [labelsOpen])
+
   const homeIds = useMemo(() => [...household(graph, HOME_PERSON)], [graph])
 
   useEffect(() => {
@@ -164,12 +230,13 @@ export default function App() {
           overviewRequest={overviewRequest}
           homeIds={homeIds}
           homeRequest={homeRequest}
-          filterKey={JSON.stringify(filter)}
+          filterKey={JSON.stringify([filter, focus])}
           generation={graph.generation}
           generationCount={graph.generationCount}
           inset={inset}
+          labels={labels}
           selectedId={editing ? editing.person.id || null : (selected?.id ?? null)}
-          onSelect={(id) => !editing && select(id)}
+          onSelect={pick}
           reducedMotion={reducedMotion}
           panelBeside={wide && (!!selected || !!editing)}
         />
@@ -180,8 +247,27 @@ export default function App() {
         {count === 0 && (
           <p>{people === null ? (loadFailed ? strings.loadFailed : strings.loading) : strings.empty}</p>
         )}
-        {count > 0 && <Search people={graph.people} onSelect={(id) => !editing && select(id)} />}
+        {count > 0 && <Search people={graph.people} onSelect={pick} />}
         {count > 0 && <SideFilter sides={sides} filter={filter} onChange={changeFilter} />}
+        {(focus || relatingFrom) && (
+          <div className="focus" role="status">
+            <span>
+              {relatingFrom
+                ? `${firstName(relatingFrom)} ↔ ${strings.relationPick}`
+                : focus!.kind === 'line'
+                  ? strings.lineOf(firstName(focus!.id))
+                  : `${firstName(focus!.from)} ↔ ${firstName(focus!.to)}`}
+              {!relatingFrom && focus?.kind === 'relation' && (
+                <small>
+                  {!related ? strings.relationNone : kin && strings.relationIs(firstName(focus.to), kin, firstName(focus.from))}
+                </small>
+              )}
+            </span>
+            <button type="button" aria-label={strings.clearFocus} title={strings.clearFocus} onClick={clearFocus}>
+              ×
+            </button>
+          </div>
+        )}
         {trialChanges && (
           <p className="trial">
             {strings.trialNotice}
@@ -212,6 +298,7 @@ export default function App() {
               onClick={() => {
                 if (!editing) select(null)
                 setFilter(NO_FILTER)
+                clearFocus()
                 setHomeRequest((n) => n + 1)
               }}
             >
@@ -228,6 +315,7 @@ export default function App() {
                 onClick={() => {
                   if (!editing) select(null)
                   setFilter(NO_FILTER)
+                  clearFocus()
                   setOverviewRequest((n) => n + 1)
                 }}
               >
@@ -235,6 +323,19 @@ export default function App() {
               </button>
               <GenerationFilter generationCount={graph.generationCount} filter={filter} onChange={changeFilter} />
             </>
+          )}
+          {count > 0 && (
+            <button
+              type="button"
+              className="icon text"
+              aria-label={strings.labels}
+              title={strings.labels}
+              aria-expanded={labelsOpen}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setLabelsOpen((open) => !open)}
+            >
+              Aa
+            </button>
           )}
           <button
             type="button"
@@ -247,6 +348,26 @@ export default function App() {
             <PlusIcon />
           </button>
         </nav>
+      )}
+      {labelsOpen && (
+        <div className="menu" ref={labelsMenu} role="menu" aria-label={strings.labels}>
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={labels.surname}
+            onClick={() => setLabels((l) => ({ ...l, surname: !l.surname }))}
+          >
+            {strings.labelSurname}
+          </button>
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={labels.years}
+            onClick={() => setLabels((l) => ({ ...l, years: !l.years }))}
+          >
+            {strings.labelYears}
+          </button>
+        </div>
       )}
 
       {editing ? (
@@ -269,7 +390,17 @@ export default function App() {
             onEdit={() => setEditing({ person: selected })}
             onAdd={startAdd}
             sides={sides.filter((s) => s.line.has(selected.id)).map((s) => s.name)}
-            onShowSide={(name) => setFilter((f) => ({ ...f, sides: [name] }))}
+            onShowSide={(name) => changeFilter({ ...filter, sides: [name] })}
+            onShowLine={() => {
+              setFilter(NO_FILTER)
+              setRelatingFrom(null)
+              setFocus({ kind: 'line', id: selected.id })
+            }}
+            onRelate={() => {
+              setFocus(null)
+              setRelatingFrom(selected.id)
+              select(null)
+            }}
           />
         )
       )}

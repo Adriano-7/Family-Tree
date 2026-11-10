@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, siblings, visiblePeople } from '../src/data/graph'
+import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, relation, siblings, visiblePeople } from '../src/data/graph'
 import { computeLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -206,5 +206,31 @@ describe('family sides and filters', () => {
     const sub = buildGraph(g.people.filter((p) => visible.has(p.id)))
     expect(sub.byId.get('mum')!.parents).toEqual(['grandpa', 'grandma'])
     expect(computeLayout(sub).positions.size).toBe(4)
+  })
+
+  it('finds how two people are related', () => {
+    const g = buildGraph(people())
+    const cousins = buildGraph([...people(), person('cousin', ['uncle', 'in-law'])])
+    expect(relation(g, 'me', 'me')).toBeNull()
+    expect(relation(g, 'me', 'nobody')).toBeNull()
+    expect(relation(buildGraph([person('a'), person('b')]), 'a', 'b')).toBeNull()
+
+    const toUncle = relation(g, 'me', 'uncle')!
+    expect([...toUncle.people].sort()).toEqual(['grandma', 'grandpa', 'me', 'mum', 'uncle'])
+    expect(toUncle.steps).toEqual({ up: 2, down: 1, half: false })
+    expect(relation(g, 'uncle', 'me')!.steps).toEqual({ up: 1, down: 2, half: false })
+    expect(relation(g, 'kid', 'nonno')!.steps).toEqual({ up: 3, down: 0, half: false })
+    expect(relation(g, 'me', 'brother')!.steps).toEqual({ up: 1, down: 1, half: false })
+    expect(relation(cousins, 'me', 'cousin')!.steps).toEqual({ up: 2, down: 2, half: false })
+
+    expect(relation(g, 'mum', 'dad')).toMatchObject({ partners: true, steps: null })
+    const byMarriage = relation(g, 'me', 'in-law')!
+    expect(byMarriage.steps).toBeNull()
+    expect([...byMarriage.people].sort()).toEqual(['grandma', 'grandpa', 'in-law', 'me', 'mum', 'uncle'])
+  })
+
+  it('tells half brothers and sisters apart', () => {
+    const g = buildGraph([person('p'), person('q'), person('r'), person('a', ['p', 'q']), person('b', ['p', 'r'])])
+    expect(relation(g, 'a', 'b')!.steps).toEqual({ up: 1, down: 1, half: true })
   })
 })

@@ -180,3 +180,63 @@ export function visiblePeople(graph: Graph<PersonLinks>, filter: Filter): Set<st
   }
   return visible && visible.size < graph.people.length ? visible : null
 }
+
+export interface Relation {
+  /** Everybody on the way from one person to the other, both included. */
+  people: Set<string>
+  /**
+   * For blood relatives: generations up from the first person to the ancestor they
+   * share, then down to the second. Null when the way goes through a marriage.
+   */
+  steps: { up: number; down: number; half: boolean } | null
+  /** The two are partners. */
+  partners: boolean
+}
+
+/** The shortest way from one person to another through parents, children and partners; null if there is none. */
+export function relation(graph: Graph<PersonLinks>, from: string, to: string): Relation | null {
+  if (!graph.byId.has(from) || !graph.byId.has(to) || from === to) return null
+  type Step = 'up' | 'down' | 'partner'
+  // Blood before marriage: among equally short ways, the one through parents and children is found first.
+  const next = (id: string): [string, Step][] => [
+    ...graph.byId.get(id)!.parents.filter((p) => graph.byId.has(p)).map((p): [string, Step] => [p, 'up']),
+    ...(graph.children.get(id) ?? []).map((c): [string, Step] => [c, 'down']),
+    ...(graph.spouses.get(id) ?? []).map((s): [string, Step] => [s, 'partner']),
+  ]
+  const cameFrom = new Map<string, [string, Step] | null>([[from, null]])
+  const queue = [from]
+  while (queue.length && !cameFrom.has(to)) {
+    const id = queue.shift()!
+    for (const [other, step] of next(id)) {
+      if (cameFrom.has(other)) continue
+      cameFrom.set(other, [id, step])
+      queue.push(other)
+    }
+  }
+  if (!cameFrom.has(to)) return null
+
+  const path = [to]
+  const steps: Step[] = []
+  for (let at = cameFrom.get(to); at; at = cameFrom.get(at[0])) {
+    path.unshift(at[0])
+    steps.unshift(at[1])
+  }
+
+  const people = new Set(path)
+  let half = false
+  // Where the way turns from going up to going down, both parents of the two children belong to it.
+  for (let i = 1; i + 1 < path.length; i++) {
+    if (steps[i - 1] !== 'up' || steps[i] !== 'down') continue
+    const [a, b] = [graph.byId.get(path[i - 1])!, graph.byId.get(path[i + 1])!]
+    const shared = a.parents.filter((p) => graph.byId.has(p) && b.parents.includes(p))
+    shared.forEach((p) => people.add(p))
+    const known = (p: PersonLinks) => p.parents.filter((x) => graph.byId.has(x)).length
+    half = shared.length < Math.max(known(a), known(b))
+  }
+
+  const up = steps.filter((s) => s === 'up').length
+  const down = steps.filter((s) => s === 'down').length
+  const turns = steps.slice(1).filter((s, i) => s !== steps[i]).length
+  const blood = !steps.includes('partner') && turns <= 1 && (up === 0 || down === 0 || steps[0] === 'up')
+  return { people, steps: blood ? { up, down, half } : null, partners: steps.length === 1 && steps[0] === 'partner' }
+}

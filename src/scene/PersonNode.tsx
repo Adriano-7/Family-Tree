@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Person } from '../data/types'
-import { asset } from '../ui/format'
+import { asset, lifeYears } from '../ui/format'
 import type { Vec3 } from './layout'
 import { firstNameOf, shortNameOf, haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
 
@@ -17,6 +17,10 @@ interface Props {
   active: boolean
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
+  /** Write the last name under every star, not just the one in focus. */
+  showSurname: boolean
+  /** Write the years of birth and death under the name. */
+  showYears: boolean
 }
 
 const RADIUS = 0.9
@@ -26,13 +30,14 @@ const GROW_FROM = 26
 const GROW_MAX = 2.7
 const scratch = new THREE.Vector3()
 
-export function PersonNode({ person, position, tint, emphasis, active, onHover, onSelect }: Props) {
+export function PersonNode({ person, position, tint, emphasis, active, onHover, onSelect, showSurname, showYears }: Props) {
   const group = useRef<THREE.Group>(null)
   const disc = useRef<THREE.MeshBasicMaterial>(null)
   const ring = useRef<THREE.MeshBasicMaterial>(null)
   const glow = useRef<THREE.MeshBasicMaterial>(null)
   const label = useRef<THREE.MeshBasicMaterial>(null)
   const shortLabel = useRef<THREE.MeshBasicMaterial>(null)
+  const yearsLabel = useRef<THREE.MeshBasicMaterial>(null)
   const labels = useRef<THREE.Group>(null)
   /** Dimming darkens the disc instead of fading it: on the black sky it looks the same, but stays opaque so links behind it don't show through. */
   const fade = useRef(1)
@@ -40,11 +45,14 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
   const initials = useMemo(() => initialsTexture(person.name, tint), [person.name, tint])
   const nameTexture = useMemo(() => labelTexture(shortNameOf(person.name)), [person.name])
   const firstNameTexture = useMemo(() => labelTexture(firstNameOf(person.name)), [person.name])
+  const years = showYears ? lifeYears(person) : ''
+  const yearsTexture = useMemo(() => (years ? labelTexture(years, true) : null), [years])
   const [photo, setPhoto] = useState<THREE.Texture | null>(null)
 
   useEffect(() => () => initials.dispose(), [initials])
   useEffect(() => () => nameTexture.dispose(), [nameTexture])
   useEffect(() => () => firstNameTexture.dispose(), [firstNameTexture])
+  useEffect(() => () => yearsTexture?.dispose(), [yearsTexture])
   useEffect(() => {
     if (!person.thumb) return
     let alive = true
@@ -81,10 +89,11 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
     const grow = THREE.MathUtils.clamp(d / GROW_FROM, 1, GROW_MAX)
     labels.current.scale.setScalar(grow)
     labels.current.position.y = -RADIUS - 0.18 - (LABEL_HEIGHT / 2) * grow
-    const full = active ? 1 : 0
+    const full = active || showSurname ? 1 : 0
     const strength = dim ? 0.22 : 1
     label.current.opacity += (full * strength - label.current.opacity) * k
     shortLabel.current.opacity += ((1 - full) * strength - shortLabel.current.opacity) * k
+    if (yearsLabel.current) yearsLabel.current.opacity += (strength - yearsLabel.current.opacity) * k
   })
 
   return (
@@ -142,6 +151,21 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
               />
             </mesh>
           ))}
+          {yearsTexture && (
+            <mesh renderOrder={3} position-y={-LABEL_HEIGHT * 0.82}>
+              <planeGeometry args={[LABEL_HEIGHT * LABEL_ASPECT, LABEL_HEIGHT]} />
+              <meshBasicMaterial
+                ref={yearsLabel}
+                map={yearsTexture}
+                transparent
+                opacity={0}
+                depthWrite={false}
+                depthTest={false}
+                toneMapped={false}
+                fog={false}
+              />
+            </mesh>
+          )}
         </group>
       </group>
     </Billboard>

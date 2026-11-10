@@ -17,6 +17,10 @@ interface Props {
   /** The family sides this person belongs to. */
   sides: string[]
   onShowSide: (name: string) => void
+  /** Show only this person's ancestors and descendants. */
+  onShowLine: () => void
+  /** Start choosing a second person, to see how the two are related. */
+  onRelate: () => void
 }
 
 function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph: Props['graph'] }) {
@@ -48,7 +52,7 @@ function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph:
   )
 }
 
-export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onShowSide }: Props) {
+export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onShowSide, onShowLine, onRelate }: Props) {
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -88,6 +92,14 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onSh
             ))}
           </div>
         )}
+        <div className="chips person-views">
+          <button type="button" className="chip" onClick={onShowLine}>
+            {strings.showLine}
+          </button>
+          <button type="button" className="chip" onClick={onRelate}>
+            {strings.showRelation}
+          </button>
+        </div>
         {person.bio && <div className="story" dangerouslySetInnerHTML={{ __html: renderBio(person.bio) }} />}
         {person.gallery.length > 0 && (
           <section>
