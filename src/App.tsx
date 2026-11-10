@@ -258,7 +258,14 @@ export default function App() {
       )}
 
       <header className="masthead" ref={masthead}>
-        <h1>{strings.title}</h1>
+        <div className="title">
+          <h1>{strings.title}</h1>
+          {count > 0 && (
+            <span className="count" aria-live="polite">
+              {view.people.length < count ? strings.shownOf(view.people.length, count) : strings.people(count)}
+            </span>
+          )}
+        </div>
         {count === 0 && (
           <p>{people === null ? (loadFailed ? strings.loadFailed : strings.loading) : strings.empty}</p>
         )}

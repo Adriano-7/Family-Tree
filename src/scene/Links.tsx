@@ -51,10 +51,13 @@ export function Links({ segments, line, shown }: Props) {
   }, [geometry, segments, line, shown])
 
   return (
-    <lineSegments geometry={geometry} frustumCulled={false}>
+    // Drawn before the stars, so a disc always covers the lines that reach it. Depth alone is not
+    // enough: each star turns to face the camera, and seen from an angle its tilted edge can sit
+    // behind the lines (most visibly when it grows under the pointer). Not marked transparent, so it
+    // is drawn with the opaque stars, in renderOrder; three.js still blends it additively.
+    <lineSegments geometry={geometry} frustumCulled={false} renderOrder={0}>
       <lineBasicMaterial
         vertexColors
-        transparent
         depthWrite={false}
         blending={THREE.AdditiveBlending}
         toneMapped={false}

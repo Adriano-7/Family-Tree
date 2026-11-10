@@ -6,6 +6,8 @@ export const strings = {
   searchPlaceholder: 'Procurar',
   searchNoResults: 'Ninguém com esse nome',
   wholeTree: 'Ver a árvore toda',
+  people: (n: number) => `${n} ${n === 1 ? 'pessoa' : 'pessoas'}`,
+  shownOf: (shown: number, total: number) => `${shown} de ${total}`,
   dock: 'Vista e filtros',
   myFamily: 'A minha família',
   filterSides: 'Lado da família',
