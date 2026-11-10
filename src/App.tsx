@@ -30,9 +30,9 @@ const LABELS_KEY = 'family-tree-labels'
 function storedLabels(): Labels {
   try {
     const saved = JSON.parse(localStorage.getItem(LABELS_KEY) ?? '{}') as Partial<Labels>
-    return { surname: !!saved.surname, years: !!saved.years }
+    return { surname: !!saved.surname, years: saved.years ?? true }
   } catch {
-    return { surname: false, years: false }
+    return { surname: false, years: true }
   }
 }
 
