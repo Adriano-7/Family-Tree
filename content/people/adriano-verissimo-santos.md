@@ -1,4 +1,5 @@
 ---
+families: [Santos]
 name: Adriano Veríssimo Teixeira dos Santos
 born: 1939
 died: 2009

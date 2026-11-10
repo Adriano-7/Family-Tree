@@ -17,6 +17,17 @@ interface Props {
   panelBeside: boolean
   /** Changes every time the visitor asks to see the whole tree again. */
   overviewRequest: number
+  /** The household the visit starts on; empty to start on the whole tree. */
+  homeIds: string[]
+  /** Changes every time the visitor asks to go back to that household. */
+  homeRequest: number
+  /** Changes when a filter shows other people: the camera then takes in the new tree. */
+  filterKey: string
+  /** Generations in the complete tree, so a star keeps its colour while others are hidden. */
+  generation: Map<string, number>
+  generationCount: number
+  /** Pixels of the view taken by the title and filters, which the tree should stay clear of. */
+  inset: () => { left: number; top: number }
 }
 
 const SKY = '#000000'
@@ -25,6 +36,7 @@ const OLDEST = new THREE.Color('#ffb98a')
 const MIDDLE = new THREE.Color('#fff3e4')
 const YOUNGEST = new THREE.Color('#bcd6ff')
 const FOCUS_DISTANCE = 13
+const CLOSEST_FRAME = 16
 const FOV = 45
 
 // The tree is a flat chart: dragging slides it, the wheel or a pinch zooms. It never rotates.
@@ -32,14 +44,32 @@ const { ACTION } = CameraControlsImpl
 const PAN_WITH_MOUSE = { left: ACTION.TRUCK, middle: ACTION.TRUCK, right: ACTION.TRUCK, wheel: ACTION.DOLLY }
 const PAN_WITH_TOUCH = { one: ACTION.TOUCH_TRUCK, two: ACTION.TOUCH_DOLLY_TRUCK, three: ACTION.TOUCH_DOLLY_TRUCK }
 
-function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside, overviewRequest }: Props) {
+function Scene({
+  graph,
+  layout,
+  selectedId,
+  onSelect,
+  reducedMotion,
+  panelBeside,
+  overviewRequest,
+  homeIds,
+  homeRequest,
+  filterKey,
+  generation,
+  generationCount,
+  inset,
+}: Props) {
   const controls = useRef<CameraControlsImpl>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const started = useRef(false)
   const lastOverview = useRef(overviewRequest)
-  const aspect = useThree((s) => s.size.width / s.size.height)
-  const aspectRef = useRef(aspect)
-  aspectRef.current = aspect
+  const lastHome = useRef(homeRequest)
+  const lastFilter = useRef(filterKey)
+  /** The people last framed, until the visitor moves the view or opens somebody. */
+  const framed = useRef<string[] | null>(null)
+  const size = useThree((s) => s.size)
+  const sizeRef = useRef(size)
+  sizeRef.current = size
   const { positions } = layout
 
   const radius = useMemo(() => {
@@ -48,22 +78,37 @@ function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside
     return r + 4
   }, [positions])
 
-  /** How far back the camera must be, on the z axis, to see everybody. */
-  const overviewDistance = (aspect: number) => {
+  /** Faces these people (everybody when none are given) from just far enough to see them all. */
+  const frame = (ids: string[], animate: boolean) => {
+    framed.current = ids
+    const spots = ids.map((id) => positions.get(id)).filter((p) => !!p)
+    const all = spots.length ? spots : [...positions.values()]
+    if (!all.length) return
+    const xs = all.map((p) => p[0])
+    const ys = all.map((p) => p[1])
+    const [left, right, bottom, top] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2))
-    let distance = 12
-    for (const [x, y, z] of positions.values())
-      distance = Math.max(distance, z + (Math.abs(x) + 3.5) / (tan * aspect), z + (Math.abs(y) + 4) / tan)
-    return distance
+    // The people go in the part of the view that the title and filters leave free.
+    const { width, height } = sizeRef.current
+    const covered = inset()
+    const free = { x: Math.max(0.4, 1 - covered.left / width), y: Math.max(0.4, 1 - covered.top / height) }
+    const distance = Math.max(
+      CLOSEST_FRAME,
+      ((right - left) / 2 + 3.5) / (tan * (width / height) * free.x),
+      ((top - bottom) / 2 + 4) / (tan * free.y),
+    )
+    const x = (left + right) / 2 - (1 - free.x) * distance * tan * (width / height)
+    const y = (top + bottom) / 2 + (1 - free.y) * distance * tan
+    void controls.current?.setLookAt(x, y, distance, x, y, 0, animate)
   }
 
   const tints = useMemo(() => {
-    const last = Math.max(1, graph.generationCount - 1)
-    return Array.from({ length: graph.generationCount }, (_, g) => {
+    const last = Math.max(1, generationCount - 1)
+    return Array.from({ length: generationCount }, (_, g) => {
       const t = g / last
       return t < 0.5 ? OLDEST.clone().lerp(MIDDLE, t * 2) : MIDDLE.clone().lerp(YOUNGEST, t * 2 - 1)
     })
-  }, [graph.generationCount])
+  }, [generationCount])
 
   const focusId = hoverId ?? selectedId
   const focus = useMemo(() => (focusId ? lineage(graph, focusId) : null), [graph, focusId])
@@ -73,21 +118,28 @@ function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside
     return () => void (document.body.style.cursor = '')
   }, [hoverId])
 
-  // Camera: the whole tree from the front on arrival and on request, otherwise fly to whoever is selected.
+  // Camera: the home household on arrival, the whole tree or that household on request,
+  // the new tree when a filter changes it; otherwise fly to whoever is selected.
   useEffect(() => {
     const c = controls.current
     if (!c) return
     const animate = started.current && !reducedMotion
-    const asked = lastOverview.current !== overviewRequest
+    const askedAll = lastOverview.current !== overviewRequest
+    const askedHome = lastHome.current !== homeRequest
+    const filtered = lastFilter.current !== filterKey
     lastOverview.current = overviewRequest
+    lastHome.current = homeRequest
+    lastFilter.current = filterKey
     const target = selectedId && positions.get(selectedId)
 
-    if (!started.current || (asked && !target)) {
-      void c.setLookAt(0, 0, overviewDistance(aspectRef.current), 0, 0, 0, animate)
+    if (!target) {
+      if (!started.current || askedHome) frame(homeIds, animate)
+      else if (askedAll || filtered) frame([], animate)
     }
     started.current = true
 
     if (target) {
+      framed.current = null
       // Face the person straight on.
       const [x, y, z] = target
       void c.setLookAt(x, y + 0.8, z + FOCUS_DISTANCE, x, y - 0.6, z, animate)
@@ -95,7 +147,12 @@ function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside
     } else {
       void c.setFocalOffset(0, 0, 0, animate)
     }
-  }, [selectedId, positions, reducedMotion, panelBeside, overviewRequest])
+  }, [selectedId, positions, reducedMotion, panelBeside, overviewRequest, homeRequest, filterKey])
+
+  // The framing depends on the size of the window (measured a moment after arrival, and on every resize).
+  useEffect(() => {
+    if (framed.current) frame(framed.current, false)
+  }, [size.width, size.height])
 
   return (
     <>
@@ -107,7 +164,7 @@ function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside
           key={p.id}
           person={p}
           position={positions.get(p.id)!}
-          tint={tints[graph.generation.get(p.id)!]}
+          tint={tints[generation.get(p.id) ?? 0]}
           emphasis={!focus ? 'normal' : focus.shown.has(p.id) ? 'lit' : 'dim'}
           active={p.id === focusId}
           onHover={setHoverId}
@@ -122,6 +179,7 @@ function Scene({ graph, layout, selectedId, onSelect, reducedMotion, panelBeside
         smoothTime={0.35}
         draggingSmoothTime={0.08}
         dollyToCursor
+        onControlStart={() => (framed.current = null)}
         mouseButtons={PAN_WITH_MOUSE}
         touches={PAN_WITH_TOUCH}
       />

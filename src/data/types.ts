@@ -14,6 +14,8 @@ export interface Person {
   birthplace: string | null
   parents: string[]
   spouses: string[]
+  /** The family sides that start with this person ("Machado"); their descendants belong to them too. */
+  families: string[]
   thumb: string | null
   portrait: string | null
   gallery: GalleryImage[]

@@ -36,6 +36,17 @@ function idList(value, field, file) {
   return [...new Set(out)]
 }
 
+/** The family sides that start with this person, e.g. `families: [Machado]`. */
+function nameList(value, field, file) {
+  if (value == null) return []
+  const out = []
+  for (const v of Array.isArray(value) ? value : [value]) {
+    if (typeof v !== 'string' || !v.trim()) fail(file, `"${field}" must be a list of family names`)
+    else out.push(v.trim())
+  }
+  return [...new Set(out)]
+}
+
 // ---- read people -----------------------------------------------------------
 
 if (!(await exists(peopleDir))) {
@@ -82,6 +93,7 @@ for (const file of files) {
     birthplace: d.birthplace ? String(d.birthplace) : null,
     parents: idList(d.parents, 'parents', label),
     spouses: idList(d.spouses, 'spouses', label),
+    families: nameList(d.families, 'families', label),
     portrait: d.portrait ? String(d.portrait) : null,
     gallery,
     bio: parsed.content.trim(),
@@ -142,6 +154,7 @@ for (const p of raw) {
     birthplace: p.birthplace,
     parents: p.parents,
     spouses: p.spouses,
+    families: p.families,
     thumb: null,
     portrait: null,
     gallery: [],

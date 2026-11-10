@@ -168,6 +168,68 @@ button {
   color: var(--warm);
 }
 
+/* ---- filters ------------------------------------------------------------ */
+
+.filters {
+  margin-top: 1rem;
+}
+
+.filters summary {
+  width: fit-content;
+  color: var(--haze);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.filter {
+  margin-top: 0.7rem;
+}
+
+.filter-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--haze);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.masthead .filter-help {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.18rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: var(--haze);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip:hover {
+  border-color: var(--paper);
+  color: var(--paper);
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: #000;
+}
+
+.person-sides {
+  margin-top: 0.8rem;
+}
+
 /* ---- buttons ------------------------------------------------------------ */
 
 button.quiet {

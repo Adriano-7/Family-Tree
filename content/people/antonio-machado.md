@@ -1,4 +1,5 @@
 ---
+families: [Machado]
 name: António Machado
 born: 1916
 died: 2005

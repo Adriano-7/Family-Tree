@@ -17,6 +17,9 @@ create table if not exists public.people (
   updated_at timestamptz not null default now()
 );
 
+-- The family sides that start with this person ("Machado"); their descendants belong to them too.
+alter table public.people add column if not exists families text[] not null default '{}';
+
 -- Anyone with the link to the site can read and edit the tree.
 alter table public.people enable row level security;
 grant select, insert, update, delete on public.people to anon, authenticated;

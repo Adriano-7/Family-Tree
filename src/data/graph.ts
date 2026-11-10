@@ -1,6 +1,6 @@
 import type { Person } from './types'
 
-export type PersonLinks = Pick<Person, 'id' | 'name' | 'born' | 'parents' | 'spouses'>
+export type PersonLinks = Pick<Person, 'id' | 'name' | 'born' | 'parents' | 'spouses'> & { families?: string[] }
 
 export interface Graph<T extends PersonLinks = Person> {
   people: T[]
@@ -110,4 +110,75 @@ export function lineage(graph: Graph<PersonLinks>, id: string): { line: Set<stri
   up(id)
   for (const x of line) shown.add(x)
   return { line, shown }
+}
+
+/** The person with their parents and brothers and sisters. */
+export function household(graph: Graph<PersonLinks>, id: string): Set<string> {
+  const p = graph.byId.get(id)
+  if (!p) return new Set()
+  return new Set([id, ...p.parents.filter((x) => graph.byId.has(x)), ...siblings(graph, id)])
+}
+
+export interface FamilySide {
+  name: string
+  /** The people the side starts with, and all their descendants. */
+  line: Set<string>
+  /** `line` plus the partners of those people. */
+  shown: Set<string>
+}
+
+/** The named sides of the family, in alphabetical order. A person can belong to several. */
+export function familySides(graph: Graph<PersonLinks>): FamilySide[] {
+  // "machado" and "Machado" are one side; the first spelling met is the one shown.
+  const found = new Map<string, [name: string, line: Set<string>]>()
+  for (const p of graph.people) {
+    for (const raw of p.families ?? []) {
+      const name = raw.trim()
+      const key = name.toLocaleLowerCase('pt')
+      if (!key) continue
+      if (!found.has(key)) found.set(key, [name, new Set()])
+      const line = found.get(key)![1]
+      const down = (x: string) => {
+        if (line.has(x)) return
+        line.add(x)
+        for (const c of graph.children.get(x) ?? []) down(c)
+      }
+      down(p.id)
+    }
+  }
+  return [...found.values()]
+    .sort(([a], [b]) => a.localeCompare(b, 'pt'))
+    .map(([name, line]) => {
+      const shown = new Set(line)
+      for (const x of line) for (const s of graph.spouses.get(x) ?? []) shown.add(s)
+      return { name, line, shown }
+    })
+}
+
+/** Everybody at most `n` generations above or below this person. */
+export function withinGenerations(graph: Graph<PersonLinks>, id: string, n: number): Set<string> {
+  const centre = graph.generation.get(id)
+  if (centre === undefined) return new Set(graph.people.map((p) => p.id))
+  return new Set(graph.people.filter((p) => Math.abs(graph.generation.get(p.id)! - centre) <= n).map((p) => p.id))
+}
+
+export interface Filter {
+  /** Names of the family sides to show; empty shows every side. */
+  sides: string[]
+  /** How many generations above and below `centreId` to show; null shows all. */
+  generations: number | null
+}
+
+/** The people a filter leaves on show, or null when it hides nobody. */
+export function visiblePeople(graph: Graph<PersonLinks>, filter: Filter, centreId: string | null): Set<string> | null {
+  let visible: Set<string> | null = null
+  if (filter.sides.length) {
+    visible = new Set()
+    for (const side of familySides(graph)) if (filter.sides.includes(side.name)) for (const id of side.shown) visible.add(id)
+  }
+  if (filter.generations !== null && centreId && graph.byId.has(centreId)) {
+    const near = withinGenerations(graph, centreId, filter.generations)
+    visible = visible ? new Set([...visible].filter((id) => near.has(id))) : near
+  }
+  return visible && visible.size < graph.people.length ? visible : null
 }

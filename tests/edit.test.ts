@@ -51,6 +51,13 @@ describe('savePerson', () => {
   })
 })
 
+describe('family sides', () => {
+  it('tidies the names of the sides that start with a person', () => {
+    const { people } = savePerson([], person('a', { families: [' Machado ', 'machado', '', 'Santos  Silva'] }))
+    expect(people[0].families).toEqual(['Machado', 'Santos Silva'])
+  })
+})
+
 describe('deletePerson', () => {
   it('removes the person and every mention of them', () => {
     const start = [person('a', { spouses: ['b'] }), person('b'), person('c', { parents: ['a', 'b'] })]

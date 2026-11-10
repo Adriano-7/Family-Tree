@@ -14,6 +14,9 @@ interface Props {
   onClose: () => void
   onEdit: () => void
   onAdd: (relative: 'child' | 'partner' | 'parent' | 'sibling') => void
+  /** The family sides this person belongs to. */
+  sides: string[]
+  onShowSide: (name: string) => void
 }
 
 function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph: Props['graph'] }) {
@@ -45,7 +48,7 @@ function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph:
   )
 }
 
-export function PersonPanel({ graph, person, onClose, onEdit, onAdd }: Props) {
+export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onShowSide }: Props) {
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -75,6 +78,15 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd }: Props) {
           <p className="dates">
             {[dates, person.birthplace && strings.bornIn(person.birthplace)].filter(Boolean).join(', ')}
           </p>
+        )}
+        {sides.length > 0 && (
+          <div className="chips person-sides" role="group" aria-label={strings.sides}>
+            {sides.map((name) => (
+              <button key={name} type="button" className="chip" title={strings.showSide(name)} onClick={() => onShowSide(name)}>
+                {name}
+              </button>
+            ))}
+          </div>
         )}
         {person.bio && <div className="story" dangerouslySetInnerHTML={{ __html: renderBio(person.bio) }} />}
         {person.gallery.length > 0 && (

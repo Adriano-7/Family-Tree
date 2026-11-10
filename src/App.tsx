@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deletePerson, emptyPerson, savePerson } from './data/edit'
-import { buildGraph } from './data/graph'
+import { HOME_PERSON } from './config'
+import { buildGraph, familySides, type Filter, household, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
 import { computeLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
+import { Filters } from './ui/Filters'
 import { useMediaQuery, useSelectedPerson } from './ui/hooks'
 import { PersonEditor } from './ui/PersonEditor'
 import { PersonPanel } from './ui/PersonPanel'
@@ -13,6 +15,7 @@ import { Search } from './ui/Search'
 import { strings } from './ui/strings'
 
 const store = createStore()
+const NO_FILTER: Filter = { sides: [], generations: null }
 
 /** The form that is open: for an existing person, or a new one (empty id). */
 interface Editing {
@@ -41,11 +44,20 @@ export default function App() {
   const [editing, setEditing] = useState<Editing | null>(null)
   const [trialChanges, setTrialChanges] = useState(() => store.hasLocalChanges?.() ?? false)
   const [overviewRequest, setOverviewRequest] = useState(0)
+  const [homeRequest, setHomeRequest] = useState(0)
+  const [filter, setFilter] = useState<Filter>(NO_FILTER)
   const [selectedId, select] = useSelectedPerson()
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const wide = useMediaQuery('(min-width: 900px)')
   const fontsReady = useFontsReady()
   const [explored, setExplored] = useState(false)
+  const masthead = useRef<HTMLElement>(null)
+  // Beside the tree on a wide screen, above it on a narrow one.
+  const inset = useCallback(() => {
+    const box = masthead.current?.getBoundingClientRect()
+    if (!box) return { left: 0, top: 0 }
+    return window.innerWidth >= 900 ? { left: box.right, top: 0 } : { left: 0, top: box.bottom }
+  }, [])
 
   const load = useCallback(() => {
     store.load().then(
@@ -74,9 +86,29 @@ export default function App() {
       return buildGraph([])
     }
   }, [people])
-  const layout = useMemo(() => computeLayout(graph), [graph])
   const selected = selectedId ? graph.byId.get(selectedId) : undefined
   const count = graph.people.length
+  const home = graph.byId.get(HOME_PERSON)
+  const sides = useMemo(() => familySides(graph), [graph])
+
+  // Generations are counted from whoever is open, otherwise from the home person.
+  const centre = selected ?? home
+  // Somebody opened from outside the chosen sides (a search, a link) is shown anyway.
+  const selectedOutside = useMemo(() => {
+    if (!selected || !filter.sides.length) return false
+    const visible = visiblePeople(graph, filter, selected.id)
+    return !!visible && !visible.has(selected.id)
+  }, [graph, filter, selected])
+  useEffect(() => {
+    if (selectedOutside) setFilter((f) => ({ ...f, sides: [] }))
+  }, [selectedOutside])
+  const view = useMemo(() => {
+    const applied = selectedOutside ? { ...filter, sides: [] } : filter
+    const visible = visiblePeople(graph, applied, centre?.id ?? null)
+    return visible ? buildGraph(graph.people.filter((p) => visible.has(p.id))) : graph
+  }, [graph, filter, selectedOutside, centre?.id])
+  const layout = useMemo(() => computeLayout(view), [view])
+  const homeIds = useMemo(() => [...household(graph, HOME_PERSON)], [graph])
 
   useEffect(() => {
     document.title = selected ? `${selected.name} – ${strings.title}` : strings.title
@@ -122,9 +154,15 @@ export default function App() {
     <div className="app" onPointerDown={() => setExplored(true)}>
       {fontsReady && count > 0 && (
         <Constellation
-          graph={graph}
+          graph={view}
           layout={layout}
           overviewRequest={overviewRequest}
+          homeIds={homeIds}
+          homeRequest={homeRequest}
+          filterKey={JSON.stringify(filter)}
+          generation={graph.generation}
+          generationCount={graph.generationCount}
+          inset={inset}
           selectedId={editing ? editing.person.id || null : (selected?.id ?? null)}
           onSelect={(id) => !editing && select(id)}
           reducedMotion={reducedMotion}
@@ -132,7 +170,7 @@ export default function App() {
         />
       )}
 
-      <header className="masthead">
+      <header className="masthead" ref={masthead}>
         <h1>{strings.title}</h1>
         <p>
           {people === null
@@ -140,18 +178,43 @@ export default function App() {
               ? strings.loadFailed
               : strings.loading
             : count
-              ? strings.summary(count, graph.generationCount)
+              ? view === graph
+                ? strings.summary(count, graph.generationCount)
+                : strings.summaryFiltered(view.people.length, count)
               : strings.empty}
         </p>
         {count > 0 && <Search people={graph.people} onSelect={(id) => !editing && select(id)} />}
+        {count > 0 && (
+          <Filters
+            sides={sides}
+            filter={filter}
+            onChange={setFilter}
+            centreName={centre ? centre.name.split(' ')[0] : null}
+            compact={!wide}
+          />
+        )}
         {people !== null && (
           <div className="masthead-actions">
+            {home && (
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => {
+                  if (!editing) select(null)
+                  setFilter(NO_FILTER)
+                  setHomeRequest((n) => n + 1)
+                }}
+              >
+                {strings.myFamily}
+              </button>
+            )}
             {count > 0 && (
               <button
                 type="button"
                 className="quiet"
                 onClick={() => {
                   if (!editing) select(null)
+                  setFilter(NO_FILTER)
                   setOverviewRequest((n) => n + 1)
                 }}
               >
@@ -211,6 +274,7 @@ export default function App() {
           onSave={commit}
           onCancel={() => setEditing(null)}
           onDelete={editing.person.id ? () => remove(editing.person.id) : undefined}
+          sideNames={sides.map((s) => s.name)}
         />
       ) : (
         selected && (
@@ -220,6 +284,8 @@ export default function App() {
             onClose={() => select(null)}
             onEdit={() => setEditing({ person: selected })}
             onAdd={startAdd}
+            sides={sides.filter((s) => s.line.has(selected.id)).map((s) => s.name)}
+            onShowSide={(name) => setFilter((f) => ({ ...f, sides: [name] }))}
           />
         )
       )}

@@ -12,6 +12,7 @@ export function emptyPerson(): Person {
     birthplace: null,
     parents: [],
     spouses: [],
+    families: [],
     thumb: null,
     portrait: null,
     gallery: [],
@@ -34,6 +35,20 @@ export function slugFor(name: string, taken: Iterable<string>) {
   return slug
 }
 
+/** Tidy side names; "machado" and "Machado" are the same side (the first spelling wins). */
+export function cleanFamilies(names: string[] | undefined) {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of names ?? []) {
+    const name = raw.trim().replace(/\s+/g, ' ')
+    const key = name.toLocaleLowerCase('pt')
+    if (!name || seen.has(key)) continue
+    seen.add(key)
+    out.push(name)
+  }
+  return out
+}
+
 export class EditError extends Error {
   constructor(public reason: 'name' | 'date' | 'loop') {
     super(reason)
@@ -54,6 +69,7 @@ export function savePerson(people: Person[], person: Person): EditResult {
     name: person.name.trim(),
     parents: [...new Set(person.parents)].filter((p) => p !== person.id),
     spouses: [...new Set(person.spouses)].filter((s) => s !== person.id),
+    families: cleanFamilies(person.families),
   }
   if (!clean.name) throw new EditError('name')
   if ([clean.born, clean.died].some((d) => d && !DATE_PATTERN.test(d))) throw new EditError('date')

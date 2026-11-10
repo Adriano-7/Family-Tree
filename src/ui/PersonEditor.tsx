@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EditError, slugFor } from '../data/edit'
+import { cleanFamilies, EditError, slugFor } from '../data/edit'
 import { type Graph, lineage } from '../data/graph'
 import { prepareImage } from '../data/images'
 import type { Store } from '../data/store'
@@ -16,6 +16,8 @@ interface Props {
   onSave: (person: Person) => Promise<void>
   onCancel: () => void
   onDelete?: () => Promise<void>
+  /** The family sides that already exist, offered as suggestions. */
+  sideNames: string[]
 }
 
 /** A photo in the form: already stored (`src`) or just picked and waiting to be uploaded (`blob`). */
@@ -30,7 +32,7 @@ interface Photo {
 
 let photoKey = 0
 
-export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete }: Props) {
+export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete, sideNames }: Props) {
   const isNew = !person.id
   const [name, setName] = useState(person.name)
   const [born, setBorn] = useState(person.born ?? '')
@@ -41,6 +43,8 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete 
   const [partners, setPartners] = useState(
     isNew ? person.spouses : [...new Set([...(graph.spouses.get(person.id) ?? []), ...person.spouses])],
   )
+  const [families, setFamilies] = useState(person.families)
+  const [familyDraft, setFamilyDraft] = useState('')
   // `undefined`: keep what is stored. `null`: removed. Otherwise a newly picked photo.
   const [portrait, setPortrait] = useState<{ thumb: Blob; full: Blob; preview: string } | null | undefined>(undefined)
   const [photos, setPhotos] = useState<Photo[]>(() =>
@@ -135,6 +139,8 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete 
         birthplace: birthplace.trim() || null,
         parents,
         spouses: partners,
+        // A name typed but not yet confirmed with Enter still counts.
+        families: cleanFamilies([...families, familyDraft]),
         thumb,
         portrait: full,
         gallery,
@@ -194,6 +200,48 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete 
 
         <PeoplePicker label={strings.fieldParents} candidates={parentCandidates} value={parents} onChange={setParents} max={2} />
         <PeoplePicker label={strings.fieldPartners} candidates={partnerCandidates} value={partners} onChange={setPartners} />
+
+        <div className="field picker">
+          <label htmlFor="f-families">{strings.fieldFamilies}</label>
+          {families.length > 0 && (
+            <ul className="chosen">
+              {families.map((name) => (
+                <li key={name}>
+                  {name}
+                  <button
+                    type="button"
+                    aria-label={strings.pickerRemove(name)}
+                    onClick={() => setFamilies(families.filter((f) => f !== name))}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <input
+            id="f-families"
+            list="f-families-known"
+            autoComplete="off"
+            placeholder={strings.familiesPlaceholder}
+            value={familyDraft}
+            onChange={(e) => setFamilyDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ',') return
+              e.preventDefault()
+              setFamilies(cleanFamilies([...families, familyDraft]))
+              setFamilyDraft('')
+            }}
+          />
+          <datalist id="f-families-known">
+            {sideNames
+              .filter((name) => !families.includes(name))
+              .map((name) => (
+                <option key={name} value={name} />
+              ))}
+          </datalist>
+          <p className="help">{strings.fieldFamiliesHelp}</p>
+        </div>
 
         <div className="field">
           <label htmlFor="f-story">{strings.fieldStory}</label>

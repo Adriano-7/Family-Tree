@@ -37,6 +37,7 @@ Then open the address it prints. The page updates by itself when you change anyt
 Only `name` is required. Some details:
 
 - `born` and `died` accept `1938`, `1938-04` or `1938-04-12`.
+- `families` (optional, e.g. `families: [Machado]`) names the family sides that start with this person. Write it only on the oldest person of each side: their descendants belong to it automatically, and the site can then show one side at a time.
 - `parents` and `spouses` list the file names of other people. You never list children: they follow from `parents`. A partner only needs to be written on one of the two people.
 - The text below the second `---` is Markdown, so `*italics*`, links and headings work.
 

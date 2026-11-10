@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, lineage, siblings } from '../src/data/graph'
+import { buildGraph, closeFamily, familySides, household, lineage, siblings, visiblePeople, withinGenerations } from '../src/data/graph'
 import { computeLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -148,5 +148,62 @@ describe('computeLayout', () => {
     const toDad = segments.filter((s) => s.children.includes('dad') && s.parents.includes('nan'))
     expect(toDad.length).toBeGreaterThan(0)
     expect(toDad.some((s) => s.far)).toBe(false)
+  })
+})
+
+describe('family sides and filters', () => {
+  // Two sides that meet in mum and dad; "in-law" married the uncle.
+  const people = () => [
+    { ...person('grandpa', [], ['grandma']), families: ['Santos'] },
+    { ...person('grandma'), families: ['Silva'] },
+    person('mum', ['grandpa', 'grandma']),
+    person('uncle', ['grandpa', 'grandma'], ['in-law']),
+    person('in-law'),
+    { ...person('nonno'), families: ['Machado', 'machado '] },
+    person('dad', ['nonno'], ['mum']),
+    person('aunt', ['nonno']),
+    person('me', ['mum', 'dad']),
+    person('brother', ['mum', 'dad']),
+    person('kid', ['me']),
+  ]
+  const side = (name: string) => familySides(buildGraph(people())).find((s) => s.name === name)!
+
+  it('passes a side down to every descendant', () => {
+    expect([...side('Santos').line].sort()).toEqual(['brother', 'grandpa', 'kid', 'me', 'mum', 'uncle'])
+    expect([...side('Machado').line].sort()).toEqual(['aunt', 'brother', 'dad', 'kid', 'me', 'nonno'])
+  })
+
+  it('shows partners beside the side without making them part of it', () => {
+    expect(side('Santos').line.has('in-law')).toBe(false)
+    expect(side('Santos').shown.has('in-law')).toBe(true)
+    expect(side('Santos').shown.has('dad')).toBe(true)
+    expect(side('Santos').shown.has('aunt')).toBe(false)
+  })
+
+  it('lists each side once, whatever the spelling, in alphabetical order', () => {
+    expect(familySides(buildGraph(people())).map((s) => s.name)).toEqual(['Machado', 'Santos', 'Silva'])
+  })
+
+  it('finds a household: parents, brothers and sisters', () => {
+    const g = buildGraph(people())
+    expect([...household(g, 'me')].sort()).toEqual(['brother', 'dad', 'me', 'mum'])
+    expect(household(g, 'nobody').size).toBe(0)
+  })
+
+  it('keeps the generations around a person', () => {
+    const g = buildGraph(people())
+    expect([...withinGenerations(g, 'me', 1)].sort()).toEqual(['aunt', 'brother', 'dad', 'in-law', 'kid', 'me', 'mum', 'uncle'])
+    expect(withinGenerations(g, 'me', 0).has('mum')).toBe(false)
+  })
+
+  it('combines the filters, and lays out what is left', () => {
+    const g = buildGraph(people())
+    expect(visiblePeople(g, { sides: [], generations: null }, 'me')).toBeNull()
+    expect(visiblePeople(g, { sides: ['Santos', 'Silva', 'Machado'], generations: null }, 'me')).toBeNull()
+    const visible = visiblePeople(g, { sides: ['Machado'], generations: 1 }, 'me')!
+    expect([...visible].sort()).toEqual(['aunt', 'brother', 'dad', 'kid', 'me', 'mum'])
+    const sub = buildGraph(g.people.filter((p) => visible.has(p.id)))
+    expect(sub.byId.get('mum')!.parents).toEqual(['grandpa', 'grandma'])
+    expect(computeLayout(sub).positions.size).toBe(6)
   })
 })
