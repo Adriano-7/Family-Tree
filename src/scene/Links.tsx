@@ -14,14 +14,16 @@ const PARENT = new THREE.Color('#93a0bd')
 const PARTNER = new THREE.Color('#e0b48a')
 const LIT = new THREE.Color('#ffffff')
 const LIT_PARTNER = new THREE.Color('#ffd9b0')
+/** Links sit just behind the plane of the stars, so the discs cover the ends that meet them. */
+const DEPTH = -0.1
 
 export function Links({ segments, line, shown }: Props) {
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry()
     const pos = new Float32Array(segments.length * 6)
     segments.forEach((s, i) => {
-      pos.set(s.a, i * 6)
-      pos.set(s.b, i * 6 + 3)
+      pos.set([s.a[0], s.a[1], s.a[2] + DEPTH], i * 6)
+      pos.set([s.b[0], s.b[1], s.b[2] + DEPTH], i * 6 + 3)
     })
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(segments.length * 6), 3))

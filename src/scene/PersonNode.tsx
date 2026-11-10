@@ -34,6 +34,8 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
   const label = useRef<THREE.MeshBasicMaterial>(null)
   const shortLabel = useRef<THREE.MeshBasicMaterial>(null)
   const labels = useRef<THREE.Group>(null)
+  /** Dimming darkens the disc instead of fading it: on the black sky it looks the same, but stays opaque so links behind it don't show through. */
+  const fade = useRef(1)
 
   const initials = useMemo(() => initialsTexture(person.name, tint), [person.name, tint])
   const nameTexture = useMemo(() => labelTexture(shortNameOf(person.name)), [person.name])
@@ -69,8 +71,9 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
     const dim = emphasis === 'dim'
     const scale = active ? 1.3 : emphasis === 'lit' ? 1.08 : 1
     group.current.scale.lerp(scratch.setScalar(scale), k)
-    disc.current.opacity += ((dim ? 0.22 : 1) - disc.current.opacity) * k
-    ring.current.opacity += ((dim ? 0.15 : 1) - ring.current.opacity) * k
+    fade.current += ((dim ? 0.22 : 1) - fade.current) * k
+    disc.current.color.setScalar(fade.current)
+    ring.current.color.copy(tint).multiplyScalar(fade.current ** 1.25) // 1 → 1, 0.22 → 0.15
     glow.current.opacity += ((dim ? 0.04 : active ? 0.5 : emphasis === 'lit' ? 0.4 : 0.3) - glow.current.opacity) * k
 
     // Names: a first name under every star; first and last name for the one in focus.
@@ -103,7 +106,7 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
         </mesh>
         <mesh renderOrder={2}>
           <ringGeometry args={[RADIUS, RADIUS + 0.07, 64]} />
-          <meshBasicMaterial ref={ring} color={tint} transparent toneMapped={false} />
+          <meshBasicMaterial ref={ring} color={tint} toneMapped={false} />
         </mesh>
         <mesh
           renderOrder={2}
@@ -118,7 +121,7 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
           }}
         >
           <circleGeometry args={[RADIUS, 48]} />
-          <meshBasicMaterial ref={disc} map={photo ?? initials} transparent toneMapped={false} />
+          <meshBasicMaterial ref={disc} map={photo ?? initials} toneMapped={false} />
         </mesh>
         <group ref={labels}>
           {[
