@@ -40,6 +40,8 @@ export type AddressView =
   | null
 
 const LINE = 'linhagem'
+/** The older name for a direct line, so links sent before the rename still open. */
+const OLD_LINE = 'linha'
 const FAMILY = 'familia'
 const RELATION = 'parentesco'
 
@@ -54,7 +56,7 @@ export function readAddress(pathname: string): AddressView {
         return p.toLowerCase()
       }
     })
-  if (parts[0] === LINE) return parts[1] ? { kind: 'line', id: parts[1] } : null
+  if (parts[0] === LINE || parts[0] === OLD_LINE) return parts[1] ? { kind: 'line', id: parts[1] } : null
   if (parts[0] === FAMILY) return parts[1] ? { kind: 'family', id: parts[1] } : null
   if (parts[0] === RELATION) return parts[1] && parts[2] ? { kind: 'relation', from: parts[1], to: parts[2] } : null
   return parts[0] ? { kind: 'side', slug: parts[0] } : null

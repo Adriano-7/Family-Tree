@@ -14,6 +14,7 @@ describe('shareable addresses', () => {
     expect(readAddress('/')).toBeNull()
     expect(readAddress('/Machado/')).toEqual({ kind: 'side', slug: 'machado' })
     expect(readAddress('/linhagem/rosa-machado')).toEqual({ kind: 'line', id: 'rosa-machado' })
+    expect(readAddress('/linha/rosa-machado')).toEqual({ kind: 'line', id: 'rosa-machado' })
     expect(readAddress('/familia/rosa-machado')).toEqual({ kind: 'family', id: 'rosa-machado' })
     expect(readAddress('/parentesco/rosa-machado/adriano-alexandre-machado/')).toEqual({
       kind: 'relation',
