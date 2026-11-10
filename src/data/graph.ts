@@ -167,16 +167,17 @@ export function familySides(graph: Graph<PersonLinks>): FamilySide[] {
     })
 }
 
-/** Everybody in the oldest `n` generations of the tree. */
-export function oldestGenerations(graph: Graph<PersonLinks>, n: number): Set<string> {
-  return new Set(graph.people.filter((p) => graph.generation.get(p.id)! < n).map((p) => p.id))
+/** Everybody from generation `first` to generation `last` of the tree, both included; 0 is the oldest. */
+export function generationsBetween(graph: Graph<PersonLinks>, first: number, last: number): Set<string> {
+  const inRange = (id: string) => graph.generation.get(id)! >= first && graph.generation.get(id)! <= last
+  return new Set(graph.people.filter((p) => inRange(p.id)).map((p) => p.id))
 }
 
 export interface Filter {
   /** Names of the family sides to show; empty shows every side. */
   sides: string[]
-  /** How many generations to show, counting down from the oldest; null shows all. */
-  generations: number | null
+  /** The oldest and the youngest generation to show (0 is the oldest of all); null shows all. */
+  generations: [first: number, last: number] | null
 }
 
 /** The people a filter leaves on show, or null when it hides nobody. */
@@ -187,8 +188,8 @@ export function visiblePeople(graph: Graph<PersonLinks>, filter: Filter): Set<st
     for (const side of familySides(graph)) if (filter.sides.includes(side.name)) for (const id of side.shown) visible.add(id)
   }
   if (filter.generations !== null) {
-    const oldest = oldestGenerations(graph, filter.generations)
-    visible = visible ? new Set([...visible].filter((id) => oldest.has(id))) : oldest
+    const between = generationsBetween(graph, ...filter.generations)
+    visible = visible ? new Set([...visible].filter((id) => between.has(id))) : between
   }
   return visible && visible.size < graph.people.length ? visible : null
 }

@@ -5,7 +5,7 @@ import { buildGraph, familySides, type Filter, household, lineage, pairKey, rela
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
-import { computeLayout } from './scene/layout'
+import { computeLayout, cropLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { GenerationFilter, SideFilter } from './ui/Filters'
 import { readAddress, sideSlug, useMediaQuery, useSelectedPerson, writeAddress } from './ui/hooks'
@@ -165,7 +165,15 @@ export default function App() {
     () => (visible && !selectedOutside ? buildGraph(graph.people.filter((p) => visible.has(p.id))) : graph),
     [graph, visible, selectedOutside],
   )
-  const layout = useMemo(() => computeLayout(view), [view])
+  // Hiding the oldest generations must not shuffle the rest: brothers and sisters would drift apart
+  // once their parents are gone. So the tree is drawn as if they were there, and then they are left out.
+  const hiddenAbove = !focus && !relatingFrom && !selectedOutside && (filter.generations?.[0] ?? 0) > 0
+  const layout = useMemo(() => {
+    if (!hiddenAbove || !filter.generations) return computeLayout(view)
+    const withElders = visiblePeople(graph, { ...filter, generations: [0, filter.generations[1]] })
+    const whole = withElders ? buildGraph(graph.people.filter((p) => withElders.has(p.id))) : graph
+    return cropLayout(computeLayout(whole), new Set(view.people.map((p) => p.id)))
+  }, [graph, view, filter, hiddenAbove])
   // Choosing a filter that hides the open person closes that person, so the choice is not undone.
   const changeFilter = (next: Filter) => {
     if (selected && !editing) {

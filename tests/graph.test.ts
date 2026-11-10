@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, partnershipEnd, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
-import { computeLayout, LAYER_GAP } from '../src/scene/layout'
+import { buildGraph, closeFamily, familySides, household, lineage, generationsBetween, partnershipEnd, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
+import { computeLayout, cropLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
   id,
@@ -190,18 +190,38 @@ describe('family sides and filters', () => {
     expect(household(g, 'nobody').size).toBe(0)
   })
 
-  it('keeps the oldest generations', () => {
+  it('keeps a stretch of generations', () => {
     const g = buildGraph(people())
-    expect([...oldestGenerations(g, 1)].sort()).toEqual(['grandma', 'grandpa', 'nonno'])
-    expect([...oldestGenerations(g, 2)].sort()).toEqual(['aunt', 'dad', 'grandma', 'grandpa', 'in-law', 'mum', 'nonno', 'uncle'])
+    expect([...generationsBetween(g, 0, 0)].sort()).toEqual(['grandma', 'grandpa', 'nonno'])
+    expect([...generationsBetween(g, 0, 1)].sort()).toEqual(['aunt', 'dad', 'grandma', 'grandpa', 'in-law', 'mum', 'nonno', 'uncle'])
+    expect([...generationsBetween(g, 1, 1)].sort()).toEqual(['aunt', 'dad', 'in-law', 'mum', 'uncle'])
+    expect([...generationsBetween(g, 2, 2)].sort()).toEqual(['brother', 'me'])
+  })
+
+  it('hides the oldest generations without moving anybody', () => {
+    const g = buildGraph(people())
+    const whole = computeLayout(g)
+    const keep = visiblePeople(g, { sides: [], generations: [1, 2] })!
+    const cropped = cropLayout(whole, keep)
+    expect([...cropped.positions.keys()].sort()).toEqual([...keep].sort())
+    const gap = (l: typeof whole, a: string, b: string) => l.positions.get(a)![0] - l.positions.get(b)![0]
+    expect(gap(cropped, 'mum', 'uncle')).toBeCloseTo(gap(whole, 'mum', 'uncle'))
+    expect(gap(cropped, 'dad', 'aunt')).toBeCloseTo(gap(whole, 'dad', 'aunt'))
+    // No line reaches up to the hidden parents, but mum and her brother are still joined along their row.
+    const rowY = cropped.positions.get('mum')![1]
+    const lines = cropped.segments.filter((s) => s.kind === 'descent' && s.parents.includes('grandpa'))
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.every((s) => Math.max(s.a[1], s.b[1]) < rowY + LAYER_GAP)).toBe(true)
+    expect(lines.some((s) => s.a[1] === s.b[1] && s.a[0] !== s.b[0])).toBe(true)
+    expect(cropped.segments.some((s) => s.kind === 'partner' && s.parents.includes('grandpa'))).toBe(false)
   })
 
   it('combines the filters, and lays out what is left', () => {
     const g = buildGraph(people())
     expect(visiblePeople(g, { sides: [], generations: null })).toBeNull()
     expect(visiblePeople(g, { sides: ['Santos', 'Silva', 'Machado'], generations: null })).toBeNull()
-    expect(visiblePeople(g, { sides: [], generations: 4 })).toBeNull()
-    const visible = visiblePeople(g, { sides: ['Machado'], generations: 2 })!
+    expect(visiblePeople(g, { sides: [], generations: [0, 3] })).toBeNull()
+    const visible = visiblePeople(g, { sides: ['Machado'], generations: [0, 1] })!
     expect([...visible].sort()).toEqual(['aunt', 'dad', 'mum', 'nonno'])
     const sub = buildGraph(g.people.filter((p) => visible.has(p.id)))
     expect(sub.byId.get('mum')!.parents).toEqual(['grandpa', 'grandma'])

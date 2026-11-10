@@ -50,6 +50,15 @@ interface Unit {
   split: [hub: number, firstGroup: number] | null
 }
 
+/** One way of setting the family trees side by side, and how well it reads. */
+interface Arrangement {
+  flat: Map<string, [u: number, y: number]>
+  segments: Segment[]
+  width: number
+  /** Lower is better: lines that cut across the chart count most, then long row lines, then width. */
+  cost: number
+}
+
 /**
  * A tidy tree: partners sit side by side, their children fan out below them and
  * every branch keeps its own stretch of the row. The chart is flat; it lives in
@@ -59,6 +68,7 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
   const ids = graph.people.map((p) => p.id).sort()
   const age = (id: string) => `${graph.byId.get(id)!.born ?? '9999'} ${id}`
   const parentsOf = (id: string) => graph.byId.get(id)!.parents.filter((p) => graph.byId.has(p))
+  const at = (u: number, y: number): Vec3 => [u, y, 0]
 
   // ---- households ----------------------------------------------------------
   const mates = new Map<string, Set<string>>(ids.map((id) => [id, new Set(graph.spouses.get(id))]))
@@ -144,112 +154,14 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
     }
   }
   const treeSize = roots.map((_, t) => units.filter((u) => u.tree === t).reduce((n, u) => n + u.members.length, 0))
-  const row: number[] = []
+  const firstRow: number[] = []
   const waiting = new Set(roots.map((_, t) => t))
   while (waiting.size) {
-    const score = (t: number) => row.reduce((n, r) => n + links[t][r], 0)
+    const score = (t: number) => firstRow.reduce((n, r) => n + links[t][r], 0)
     const next = [...waiting].sort((a, b) => score(b) - score(a) || treeSize[b] - treeSize[a] || a - b)[0]
     waiting.delete(next)
-    if (row.length % 2) row.push(next)
-    else row.unshift(next)
-  }
-  const rank = new Map(row.map((t, i) => [t, i]))
-  for (const [child, parentTree] of crossing) {
-    const unit = unitOf.get(child)!
-    const side = Math.sign(rank.get(parentTree)! - rank.get(unit.tree)!)
-    for (let u: Unit | null = unit; u; u = u.parent) u.lean += side
-    // Inside the couple, the partner from the other tree stands on that tree's side.
-    unit.members = unit.members.filter((m) => m !== child)
-    if (side > 0) unit.members.push(child)
-    else unit.members.unshift(child)
-  }
-  for (const unit of units) {
-    const original = new Map(unit.children.map((c, i) => [c, i]))
-    unit.children.sort((a, b) => Math.sign(a.lean) - Math.sign(b.lean) || original.get(a)! - original.get(b)!)
-  }
-
-  // ---- someone with children by several partners: keep each partner's children together
-  const busLift = new Map<string, number>()
-  for (const unit of units) {
-    const keyOf = (c: Unit) => parentsOf(c.via).sort().join('+')
-    const keys = [...new Set(unit.children.map(keyOf))]
-    if (keys.length < 2) continue
-    const groups = keys.map((key) => ({
-      key,
-      parents: key.split('+'),
-      children: unit.children.filter((c) => keyOf(c) === key),
-    }))
-    const hub = unit.members.find((m) => groups.every((g) => g.parents.includes(m)))
-    const seat = (g: (typeof groups)[number]) =>
-      Math.min(...g.parents.filter((p) => p !== hub).map((p) => unit.members.indexOf(p)), unit.members.length)
-    const lean = (g: (typeof groups)[number]) => Math.sign(g.children.reduce((n, c) => n + Math.sign(c.lean), 0))
-    groups.sort((a, b) => lean(a) - lean(b) || seat(a) - seat(b))
-    if (hub) {
-      // First partner on one side of the shared parent, the others on the other side.
-      const partnerOf = (g: (typeof groups)[number]) => g.parents.filter((p) => p !== hub && unit.members.includes(p))
-      const left = partnerOf(groups[0])
-      const right = groups.slice(1).flatMap(partnerOf)
-      const rest = unit.members.filter((m) => m !== hub && !left.includes(m) && !right.includes(m))
-      unit.members = [...left, hub, ...right, ...rest]
-      unit.split = [left.length, groups[0].children.length]
-    }
-    unit.children = groups.flatMap((g) => g.children)
-    groups.forEach((g, i) => {
-      if (i > 0) g.children[0].newGroup = true
-      if (i > 1) busLift.set(g.key, (i - 1) * BUS_LIFT)
-    })
-  }
-
-  // ---- flat chart: u runs along the rows, y is the generation --------------
-  const gapBefore = (c: Unit, i: number) => (i === 0 ? 0 : c.newGroup ? GROUP_GAP : UNIT_GAP)
-  const kidsWidth = (unit: Unit) => unit.children.reduce((w, c, i) => w + c.width + gapBefore(c, i), 0)
-  const measure = (unit: Unit): number => {
-    unit.children.forEach(measure)
-    return (unit.width = Math.max(unit.members.length * SLOT, kidsWidth(unit)))
-  }
-  const place = (unit: Unit, left: number) => {
-    unit.u = left + unit.width / 2
-    let x = left + (unit.width - kidsWidth(unit)) / 2
-    unit.children.forEach((child, i) => {
-      x += gapBefore(child, i)
-      if (unit.split && i === unit.split[1]) {
-        // The shared parent stands exactly above the gap between the two groups of children.
-        const own = unit.members.length * SLOT
-        const wanted = x - GROUP_GAP / 2 - (unit.split[0] - (unit.members.length - 1) / 2) * SLOT
-        unit.u = Math.min(Math.max(wanted, left + own / 2), left + unit.width - own / 2)
-      }
-      place(child, x)
-      x += child.width
-    })
-  }
-  let width = 0
-  for (const t of row) {
-    const w = measure(roots[t])
-    place(roots[t], width)
-    width += w + TREE_GAP
-  }
-  width = Math.max(0, width - TREE_GAP)
-
-  const top = ((graph.generationCount - 1) * LAYER_GAP) / 2
-  const flat = new Map<string, [u: number, y: number]>()
-  for (const unit of units) {
-    unit.members.forEach((m, i) => {
-      const u = unit.u + (i - (unit.members.length - 1) / 2) * SLOT - width / 2
-      flat.set(m, [u, top - graph.generation.get(m)! * LAYER_GAP])
-    })
-  }
-
-  const at = (u: number, y: number): Vec3 => [u, y, 0]
-  const positions = new Map(ids.map((id) => [id, at(...flat.get(id)!)]))
-
-  // ---- lines: one stem per family, splitting to the children ---------------
-  const segments: Segment[] = []
-  const line = (
-    from: [number, number],
-    to: [number, number],
-    info: Pick<Segment, 'kind' | 'parents' | 'children' | 'far' | 'ended'>,
-  ) => {
-    segments.push({ a: at(...from), b: at(...to), ...info })
+    if (firstRow.length % 2) firstRow.push(next)
+    else firstRow.unshift(next)
   }
 
   const families = new Map<string, { parents: string[]; children: string[] }>()
@@ -261,61 +173,278 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
     families.get(key)!.children.push(id)
   }
 
-  for (const { parents, children } of families.values()) {
-    const spots = parents.map((p) => flat.get(p)!)
-    const anchor: [number, number] = [
-      spots.reduce((sum, s) => sum + s[0], 0) / spots.length,
-      Math.min(...spots.map((s) => s[1])),
-    ]
-    const home = unitOf.get(parents[0])!
-    const isLocal = (c: string) => unitOf.get(c)!.parent === home
-    const local = children.filter(isLocal).sort((a, b) => flat.get(a)![0] - flat.get(b)![0])
+  // Which tree stands where decides who can stand next to their own parents, so the order is
+  // tried out: starting from the one above, a tree moves wherever the lines come out cleaner.
+  const original = new Map(units.map((u) => [u, { members: [...u.members], children: [...u.children] }]))
+  const arrange = (row: number[]): Arrangement => {
+    for (const unit of units) {
+      unit.members = [...original.get(unit)!.members]
+      unit.children = [...original.get(unit)!.children]
+      unit.lean = 0
+      unit.newGroup = false
+      unit.split = null
+    }
+    const rank = new Map(row.map((t, i) => [t, i]))
+    for (const [child, parentTree] of crossing) {
+      const unit = unitOf.get(child)!
+      const side = Math.sign(rank.get(parentTree)! - rank.get(unit.tree)!)
+      for (let u: Unit | null = unit; u; u = u.parent) u.lean += side
+      // Inside the couple, the partner from the other tree stands on that tree's side.
+      unit.members = unit.members.filter((m) => m !== child)
+      if (side > 0) unit.members.push(child)
+      else unit.members.unshift(child)
+    }
+    for (const unit of units) {
+      const original = new Map(unit.children.map((c, i) => [c, i]))
+      unit.children.sort((a, b) => Math.sign(a.lean) - Math.sign(b.lean) || original.get(a)! - original.get(b)!)
+    }
 
-    // A child who lives in the neighbouring tree (married into it) still joins this
-    // family's row line when nobody stands in between; otherwise a direct line is drawn.
-    if (local.length) {
-      const rowY = Math.max(...local.map((c) => flat.get(c)![1]))
-      const us = [anchor[0], ...local.map((c) => flat.get(c)![0])]
-      const [from, to] = [Math.min(...us), Math.max(...us)]
-      for (const child of children.filter((c) => !local.includes(c))) {
+    // ---- someone with children by several partners: keep each partner's children together
+    const busLift = new Map<string, number>()
+    for (const unit of units) {
+      const keyOf = (c: Unit) => parentsOf(c.via).sort().join('+')
+      const keys = [...new Set(unit.children.map(keyOf))]
+      if (keys.length < 2) continue
+      const groups = keys.map((key) => ({
+        key,
+        parents: key.split('+'),
+        children: unit.children.filter((c) => keyOf(c) === key),
+      }))
+      const hub = unit.members.find((m) => groups.every((g) => g.parents.includes(m)))
+      const seat = (g: (typeof groups)[number]) =>
+        Math.min(...g.parents.filter((p) => p !== hub).map((p) => unit.members.indexOf(p)), unit.members.length)
+      const lean = (g: (typeof groups)[number]) => Math.sign(g.children.reduce((n, c) => n + Math.sign(c.lean), 0))
+      groups.sort((a, b) => lean(a) - lean(b) || seat(a) - seat(b))
+      if (hub) {
+        // First partner on one side of the shared parent, the others on the other side.
+        const partnerOf = (g: (typeof groups)[number]) => g.parents.filter((p) => p !== hub && unit.members.includes(p))
+        const left = partnerOf(groups[0])
+        const right = groups.slice(1).flatMap(partnerOf)
+        const rest = unit.members.filter((m) => m !== hub && !left.includes(m) && !right.includes(m))
+        unit.members = [...left, hub, ...right, ...rest]
+        unit.split = [left.length, groups[0].children.length]
+      }
+      unit.children = groups.flatMap((g) => g.children)
+      groups.forEach((g, i) => {
+        if (i > 0) g.children[0].newGroup = true
+        if (i > 1) busLift.set(g.key, (i - 1) * BUS_LIFT)
+      })
+    }
+
+    // ---- flat chart: u runs along the rows, y is the generation --------------
+    const gapBefore = (c: Unit, i: number) => (i === 0 ? 0 : c.newGroup ? GROUP_GAP : UNIT_GAP)
+    const kidsWidth = (unit: Unit) => unit.children.reduce((w, c, i) => w + c.width + gapBefore(c, i), 0)
+    const measure = (unit: Unit): number => {
+      unit.children.forEach(measure)
+      return (unit.width = Math.max(unit.members.length * SLOT, kidsWidth(unit)))
+    }
+    const spot = (unit: Unit, member: string) => unit.u + (unit.members.indexOf(member) - (unit.members.length - 1) / 2) * SLOT
+    const place = (unit: Unit, left: number) => {
+      unit.u = left + unit.width / 2
+      const own = unit.members.length * SLOT
+      const within = (u: number) => Math.min(Math.max(u, left + own / 2), left + unit.width - own / 2)
+      let x = left + (unit.width - kidsWidth(unit)) / 2
+      let hubAt: number | null = null
+      unit.children.forEach((child, i) => {
+        x += gapBefore(child, i)
+        // The shared parent stands exactly above the gap between the two groups of children.
+        if (unit.split && i === unit.split[1]) hubAt = x - GROUP_GAP / 2 - (unit.split[0] - (unit.members.length - 1) / 2) * SLOT
+        place(child, x)
+        x += child.width
+      })
+      if (hubAt !== null) unit.u = within(hubAt)
+      // Otherwise parents stand above the middle of their children, wherever those ended up in their own households.
+      else if (unit.children.length) {
+        const [first, last] = [unit.children[0], unit.children[unit.children.length - 1]]
+        unit.u = within((spot(first, first.via) + spot(last, last.via)) / 2)
+      }
+    }
+
+    // Each tree is laid out on its own, then pushed against the ones before it row by row: a small
+    // tree (somebody's parents and their brothers and sisters) fits above a neighbour's descendants.
+    const generationOf = (id: string) => graph.generation.get(id)!
+    const shift = new Map<number, number>()
+    const edge = new Map<number, number>() // generation -> how far right the trees so far reach
+    for (const t of row) {
+      measure(roots[t])
+      place(roots[t], 0)
+      const reach = new Map<number, [from: number, to: number]>()
+      const cover = (generation: number, from: number, to: number) => {
+        const r = reach.get(generation)
+        reach.set(generation, r ? [Math.min(r[0], from), Math.max(r[1], to)] : [from, to])
+      }
+      for (const unit of units) {
+        if (unit.tree !== t) continue
+        for (const m of unit.members) cover(generationOf(m), spot(unit, m) - SLOT / 2, spot(unit, m) + SLOT / 2)
+        // The lines down to the children need their stretch of every row they pass.
+        for (const child of unit.children) {
+          const [a, b] = [unit.u, spot(child, child.via)]
+          for (let g = unit.generation + 1; g <= generationOf(child.via); g++) cover(g, Math.min(a, b), Math.max(a, b))
+        }
+      }
+      let by = -Infinity
+      for (const [g, [from]] of reach) if (edge.has(g)) by = Math.max(by, edge.get(g)! + TREE_GAP - from)
+      if (by === -Infinity) by = edge.size ? Math.max(...edge.values()) + TREE_GAP - Math.min(...[...reach.values()].map((r) => r[0])) : 0
+      shift.set(t, by)
+      for (const [g, [, to]] of reach) edge.set(g, Math.max(edge.get(g) ?? -Infinity, to + by))
+    }
+
+    const top = ((graph.generationCount - 1) * LAYER_GAP) / 2
+    const raw = new Map<string, number>()
+    for (const unit of units) for (const m of unit.members) raw.set(m, spot(unit, m) + shift.get(unit.tree)!)
+    const [leftmost, rightmost] = [Math.min(...raw.values()) - SLOT / 2, Math.max(...raw.values()) + SLOT / 2]
+    const width = ids.length ? rightmost - leftmost : 0
+    const flat = new Map<string, [u: number, y: number]>()
+    for (const id of ids) flat.set(id, [raw.get(id)! - (leftmost + rightmost) / 2, top - generationOf(id) * LAYER_GAP])
+
+    // ---- lines: one stem per family, splitting to the children ---------------
+    const segments: Segment[] = []
+    let cost = width * 0.01
+    const line = (
+      from: [number, number],
+      to: [number, number],
+      info: Pick<Segment, 'kind' | 'parents' | 'children' | 'far' | 'ended'>,
+    ) => {
+      segments.push({ a: at(...from), b: at(...to), ...info })
+    }
+
+    const anchorOf = (parents: string[]): [number, number] => {
+      const spots = parents.map((p) => flat.get(p)!)
+      return [spots.reduce((sum, s) => sum + s[0], 0) / spots.length, Math.min(...spots.map((s) => s[1]))]
+    }
+    const stems = [...families.values()].map(({ parents, children }) => ({
+      parents,
+      at: anchorOf(parents),
+      down: Math.min(...children.map((c) => flat.get(c)![1])),
+    }))
+
+    for (const { parents, children } of families.values()) {
+      const anchor = anchorOf(parents)
+      const home = unitOf.get(parents[0])!
+      const isLocal = (c: string) => unitOf.get(c)!.parent === home
+      const local = children.filter(isLocal)
+
+      // A child who lives in the neighbouring tree (married into it) still joins this family's
+      // row line when nothing stands in between; otherwise a direct line is drawn.
+      const away = children
+        .filter((c) => !isLocal(c))
+        .sort((a, b) => Math.abs(flat.get(a)![0] - anchor[0]) - Math.abs(flat.get(b)![0] - anchor[0]))
+      for (const child of away) {
         const [u, y] = flat.get(child)!
-        if (y !== rowY || (u >= from && u <= to)) continue
+        const rowY = local.length ? Math.max(...local.map((c) => flat.get(c)![1])) : y
+        const us = [anchor[0], ...local.map((c) => flat.get(c)![0])]
+        const [from, to] = [Math.min(...us), Math.max(...us)]
+        if (y !== rowY || y >= anchor[1] || (u >= from && u <= to)) continue
         const [gapFrom, gapTo] = u < from ? [u, from] : [to, u]
-        const blocked = ids.some((id) => {
-          const [ou, oy] = flat.get(id)!
-          return oy === rowY && ou > gapFrom && ou < gapTo
-        })
-        if (!blocked) local.push(child)
+        const busY = rowY + LAYER_GAP / 2
+        const blocked =
+          ids.some((id) => {
+            const [ou, oy] = flat.get(id)!
+            return oy === rowY && ou > gapFrom && ou < gapTo
+          }) ||
+          // ...or another family's line comes down through that stretch.
+          stems.some((s) => s.parents !== parents && s.at[0] > gapFrom && s.at[0] < gapTo && s.at[1] > busY && s.down < busY)
+        if (blocked) continue
+        local.push(child)
+        cost += gapTo - gapFrom
       }
       local.sort((a, b) => flat.get(a)![0] - flat.get(b)![0])
+
+      for (const child of children.filter((c) => !local.includes(c))) {
+        line(anchor, flat.get(child)!, { kind: 'descent', far: true, parents, children: [child] })
+        cost += 1000
+      }
+      if (!local.length) continue
+
+      const busY = Math.max(...local.map((c) => flat.get(c)![1])) + LAYER_GAP / 2 + (busLift.get(parents.join('+')) ?? 0)
+      line(anchor, [anchor[0], busY], { kind: 'descent', parents, children: local })
+      const stops = [...new Set([anchor[0], ...local.map((c) => flat.get(c)![0])])].sort((a, b) => a - b)
+      for (let i = 0; i + 1 < stops.length; i++) {
+        const leftOfStem = stops[i + 1] <= anchor[0]
+        const served = local.filter((c) => (leftOfStem ? flat.get(c)![0] <= stops[i] : flat.get(c)![0] >= stops[i + 1]))
+        line([stops[i], busY], [stops[i + 1], busY], { kind: 'descent', parents, children: served })
+      }
+      for (const child of local)
+        line([flat.get(child)![0], busY], flat.get(child)!, { kind: 'descent', parents, children: [child] })
     }
 
-    for (const child of children.filter((c) => !local.includes(c)))
-      line(anchor, flat.get(child)!, { kind: 'descent', far: true, parents, children: [child] })
-    if (!local.length) continue
+    for (const id of ids)
+      for (const partner of graph.spouses.get(id)!)
+        if (id < partner)
+          line(flat.get(id)!, flat.get(partner)!, {
+            kind: 'partner',
+            parents: [id, partner],
+            // The couple's children: their line drops from the middle of this one.
+            children: families.get([id, partner].sort().join('+'))?.children ?? [],
+            ended: partnershipEnd(graph, id, partner) ?? undefined,
+          })
 
-    const busY = Math.max(...local.map((c) => flat.get(c)![1])) + LAYER_GAP / 2 + (busLift.get(parents.join('+')) ?? 0)
-    line(anchor, [anchor[0], busY], { kind: 'descent', parents, children: local })
-    const stops = [...new Set([anchor[0], ...local.map((c) => flat.get(c)![0])])].sort((a, b) => a - b)
-    for (let i = 0; i + 1 < stops.length; i++) {
-      const leftOfStem = stops[i + 1] <= anchor[0]
-      const served = local.filter((c) => (leftOfStem ? flat.get(c)![0] <= stops[i] : flat.get(c)![0] >= stops[i + 1]))
-      line([stops[i], busY], [stops[i + 1], busY], { kind: 'descent', parents, children: served })
-    }
-    for (const child of local)
-      line([flat.get(child)![0], busY], flat.get(child)!, { kind: 'descent', parents, children: [child] })
+    return { flat, segments, width, cost }
   }
 
-  for (const id of ids)
-    for (const partner of graph.spouses.get(id)!)
-      if (id < partner)
-        line(flat.get(id)!, flat.get(partner)!, {
-          kind: 'partner',
-          parents: [id, partner],
-          // The couple's children: their line drops from the middle of this one.
-          children: families.get([id, partner].sort().join('+'))?.children ?? [],
-          ended: partnershipEnd(graph, id, partner) ?? undefined,
-        })
+  let best = arrange(firstRow)
+  let bestRow = firstRow
+  for (let improved = roots.length > 1, pass = 0; improved && pass < 4; pass++) {
+    improved = false
+    for (const t of [...bestRow]) {
+      const rest = bestRow.filter((r) => r !== t)
+      for (let i = 0; i <= rest.length; i++) {
+        const row = [...rest.slice(0, i), t, ...rest.slice(i)]
+        if (row.every((r, j) => r === bestRow[j])) continue
+        const tried = arrange(row)
+        if (tried.cost < best.cost - 1e-6) [best, bestRow, improved] = [tried, row, true]
+      }
+    }
+  }
 
-  return { positions, segments, width, height: (graph.generationCount - 1) * LAYER_GAP }
+  const positions = new Map(ids.map((id) => [id, at(...best.flat.get(id)!)]))
+  return { positions, segments: best.segments, width: best.width, height: (graph.generationCount - 1) * LAYER_GAP }
+}
+
+/**
+ * The same chart with only some of its people: everybody stays where they stood, so brothers and
+ * sisters whose parents are hidden keep their place in the row, and the line that joins them.
+ */
+export function cropLayout(layout: Layout, keep: Set<string>): Layout {
+  const kept = [...layout.positions].filter(([id]) => keep.has(id))
+  if (!kept.length) return { positions: new Map(), segments: [], width: 0, height: 0 }
+  const xs = kept.map(([, p]) => p[0])
+  const ys = kept.map(([, p]) => p[1])
+  const [dx, dy] = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+  const move = ([x, y, z]: Vec3): Vec3 => [x - dx, y - dy, z]
+  // Brothers and sisters whose parents are hidden: the stretch of the row they still share.
+  const shared = new Map<string, [from: number, to: number]>()
+  for (const s of layout.segments) {
+    if (s.kind !== 'descent') continue
+    const key = s.parents.join('+')
+    for (const child of s.children) {
+      if (!keep.has(child)) continue
+      const x = layout.positions.get(child)![0]
+      const span = shared.get(key)
+      shared.set(key, span ? [Math.min(span[0], x), Math.max(span[1], x)] : [x, x])
+    }
+  }
+  const segments = layout.segments
+    .filter((s) => {
+      const parentsKept = s.parents.every((p) => keep.has(p))
+      if (s.kind === 'partner' || parentsKept) return parentsKept && (s.kind === 'partner' || s.children.some((c) => keep.has(c)))
+      // Without the parents, only the line that joins the children is left: nothing up to the
+      // parents' row, nothing running on to where they stood, and nothing over an only child.
+      const [from, to] = shared.get(s.parents.join('+')) ?? [0, 0]
+      const parentRow = Math.min(...s.parents.map((p) => layout.positions.get(p)![1]))
+      return (
+        to > from &&
+        s.children.some((c) => keep.has(c)) &&
+        Math.max(s.a[1], s.b[1]) < parentRow - 0.01 &&
+        Math.min(s.a[0], s.b[0]) > from - 0.01 &&
+        Math.max(s.a[0], s.b[0]) < to + 0.01
+      )
+    })
+    .map((s) => ({ ...s, a: move(s.a), b: move(s.b) }))
+  return {
+    positions: new Map(kept.map(([id, p]) => [id, move(p)])),
+    segments,
+    width: Math.max(...xs) - Math.min(...xs) + SLOT,
+    height: Math.max(...ys) - Math.min(...ys),
+  }
 }

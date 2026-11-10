@@ -13,7 +13,10 @@ export const strings = {
   filterSides: 'Lado da família',
   filterGenerations: 'Gerações',
   filterAllGenerations: 'Todas as gerações',
-  filterGenerationsChoice: (n: number) => (n === 1 ? 'Só a geração mais antiga' : `As ${n} gerações mais antigas`),
+  filterGenerationsChoice: (first: number, last: number) =>
+    first === last ? `Só a ${first}.ª geração` : `Da ${first}.ª à ${last}.ª geração`,
+  filterOldestGeneration: 'Geração mais antiga à vista',
+  filterYoungestGeneration: 'Geração mais nova à vista',
   showLine: 'Linha direta',
   showRelation: 'Parentesco',
   lineOf: (name: string) => `Linha de ${name}`,
