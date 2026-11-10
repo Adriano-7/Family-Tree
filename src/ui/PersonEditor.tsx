@@ -45,6 +45,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
   const [partners, setPartners] = useState(
     isNew ? person.spouses : [...new Set([...(graph.spouses.get(person.id) ?? []), ...person.spouses])],
   )
+  const [godparents, setGodparents] = useState((person.godparents ?? []).filter((g) => graph.byId.has(g)))
   const [families, setFamilies] = useState(person.families)
   // Separations either partner recorded.
   const [separated, setSeparated] = useState(() =>
@@ -147,6 +148,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
         parents,
         spouses: partners,
         separated: separated.filter((s) => partners.includes(s)),
+        godparents,
         // A name typed but not yet confirmed with Enter still counts.
         families: cleanFamilies([...families, familyDraft]),
         thumb,
@@ -224,6 +226,8 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
             </button>
           )}
         />
+
+        <PeoplePicker label={strings.fieldGodparents} candidates={partnerCandidates} value={godparents} onChange={setGodparents} />
 
         <div className="field picker">
           <label htmlFor="f-families">{strings.fieldFamilies}</label>

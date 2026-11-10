@@ -41,6 +41,8 @@ interface Editing {
   person: Person
   /** After saving a new parent, add them to this child. */
   childId?: string
+  /** After saving a new godparent, add them to this godchild. */
+  godchildId?: string
 }
 
 /** Names are painted onto the stars, so wait (briefly) for the fonts before drawing. */
@@ -253,7 +255,12 @@ export default function App() {
       person.parents = partners.length === 1 ? [selected.id, partners[0]] : [selected.id]
     } else if (relative === 'partner') person.spouses = [selected.id]
     else if (relative === 'sibling') person.parents = selected.parents.filter((p) => graph.byId.has(p))
-    setEditing({ person, childId: relative === 'parent' ? selected.id : undefined })
+    else if (relative === 'godchild') person.godparents = [selected.id]
+    setEditing({
+      person,
+      childId: relative === 'parent' ? selected.id : undefined,
+      godchildId: relative === 'godparent' ? selected.id : undefined,
+    })
   }
 
   /** Makes somebody already in the tree a relative of the open person. */
@@ -277,6 +284,11 @@ export default function App() {
     const child = editing?.childId ? result.people.find((p) => p.id === editing.childId) : undefined
     if (child) {
       result = savePerson(result.people, { ...withAllPartners(graph, child), parents: [...child.parents, person.id] })
+      changed.push(...result.changed)
+    }
+    const godchild = editing?.godchildId ? result.people.find((p) => p.id === editing.godchildId) : undefined
+    if (godchild) {
+      result = savePerson(result.people, { ...withAllPartners(graph, godchild), godparents: [...godchild.godparents, person.id] })
       changed.push(...result.changed)
     }
     await store.save(changed)

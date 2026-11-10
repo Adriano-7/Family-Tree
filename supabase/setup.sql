@@ -21,6 +21,8 @@ create table if not exists public.people (
 alter table public.people add column if not exists families text[] not null default '{}';
 -- Former partners this person separated or divorced from (also listed in spouses).
 alter table public.people add column if not exists separated text[] not null default '{}';
+-- This person's godparents (padrinho, madrinha).
+alter table public.people add column if not exists godparents text[] not null default '{}';
 
 -- Anyone with the link to the site can read and edit the tree.
 alter table public.people enable row level security;

@@ -95,6 +95,7 @@ for (const file of files) {
     parents: idList(d.parents, 'parents', label),
     spouses: idList(d.spouses, 'spouses', label),
     separated: idList(d.separated, 'separated', label),
+    godparents: idList(d.godparents, 'godparents', label),
     families: nameList(d.families, 'families', label),
     portrait: d.portrait ? String(d.portrait) : null,
     gallery,
@@ -110,7 +111,7 @@ for (const p of raw) {
   for (const g of p.gallery)
     for (const other of g.with ?? [])
       if (!byId.has(other)) fail(p.label, `a photo's "with" mentions "${other}", but content/people/${other}.md does not exist`)
-  for (const field of ['parents', 'spouses', 'separated']) {
+  for (const field of ['parents', 'spouses', 'separated', 'godparents']) {
     for (const other of p[field]) {
       if (other === p.id) fail(p.label, `lists themselves in "${field}"`)
       else if (!byId.has(other)) fail(p.label, `"${field}" mentions "${other}", but content/people/${other}.md does not exist`)
@@ -161,6 +162,7 @@ for (const p of raw) {
     parents: p.parents,
     spouses: p.spouses,
     separated: p.separated,
+    godparents: p.godparents,
     families: p.families,
     thumb: null,
     portrait: null,

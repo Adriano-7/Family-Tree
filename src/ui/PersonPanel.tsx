@@ -92,6 +92,8 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
   const dates = lifeDates(person)
   const partners = graph.spouses.get(person.id) ?? []
   const parentCount = person.parents.filter((p) => graph.byId.has(p)).length
+  const godparents = (person.godparents ?? []).filter((g) => graph.byId.has(g))
+  const godchildren = graph.godchildren.get(person.id) ?? []
 
   return (
     <aside ref={panel} className="panel" tabIndex={-1} aria-labelledby="person-name">
@@ -147,6 +149,8 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
         />
         <Relatives title={strings.children} ids={graph.children.get(person.id) ?? []} graph={graph} />
         <Relatives title={strings.siblings} ids={siblings(graph, person.id)} graph={graph} />
+        <Relatives title={godparents.length > 1 ? strings.godparents : strings.godparent} ids={godparents} graph={graph} />
+        <Relatives title={godchildren.length > 1 ? strings.godchildren : strings.godchild} ids={godchildren} graph={graph} />
         {adding ? (
           <AddRelative
             key={adding}
@@ -180,6 +184,12 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
                 {strings.addSibling}
               </button>
             )}
+            <button type="button" className="quiet" onClick={() => setAdding('godparent')}>
+              {strings.addGodparent}
+            </button>
+            <button type="button" className="quiet" onClick={() => setAdding('godchild')}>
+              {strings.addGodchild}
+            </button>
           </div>
         )}
       </div>

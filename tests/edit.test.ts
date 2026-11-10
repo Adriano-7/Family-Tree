@@ -156,3 +156,25 @@ describe('photos shared between people', () => {
     expect(changed.map((p) => p.id)).toEqual(['ana'])
   })
 })
+
+describe('godparents', () => {
+  it('lists godchildren from the godparents written on the godchild', () => {
+    const graph = buildGraph([person('a'), person('b', { godparents: ['a'] }), person('c', { godparents: ['a', 'c'] })])
+    expect(graph.godchildren.get('a')).toEqual(['b', 'c'])
+    expect(graph.godchildren.get('c')).toEqual([])
+  })
+
+  it('links somebody already in the tree as a godparent or a godchild', () => {
+    const graph = buildGraph([person('a'), person('b'), person('c', { godparents: ['a'] })])
+    expect(linkExisting(graph, graph.byId.get('a')!, 'godparent', graph.byId.get('b')!)).toMatchObject({ id: 'a', godparents: ['b'] })
+    expect(linkExisting(graph, graph.byId.get('b')!, 'godchild', graph.byId.get('c')!)).toMatchObject({ id: 'c', godparents: ['a', 'b'] })
+    expect(linkCandidates(graph, 'a', 'godchild').map((p) => p.id)).toEqual(['b'])
+    expect(linkCandidates(graph, 'c', 'godparent').map((p) => p.id)).toEqual(['b'])
+  })
+
+  it('forgets a godparent who is deleted', () => {
+    const { people, changed } = deletePerson([person('a'), person('b', { godparents: ['a'] })], 'a')
+    expect(people[0].godparents).toEqual([])
+    expect(changed.map((p) => p.id)).toEqual(['b'])
+  })
+})

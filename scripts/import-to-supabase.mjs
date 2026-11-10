@@ -36,6 +36,7 @@ for (const p of people) {
     parents: p.parents,
     spouses: p.spouses,
     separated: p.separated ?? [],
+    godparents: p.godparents ?? [],
     families: p.families ?? [],
     bio: p.bio,
     thumb: await upload(p.thumb),

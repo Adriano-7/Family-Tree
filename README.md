@@ -39,6 +39,7 @@ Only `name` is required. Some details:
 - `born` and `died` accept `1938`, `1938-04` or `1938-04-12`.
 - `families` (optional, e.g. `families: [Machado]`) names the family sides that start with this person. Write it only on the oldest person of each side: their descendants belong to it automatically, and the site can then show one side at a time.
 - `separated` (optional, e.g. `separated: [joao-silva]`) marks partners this person separated or divorced from; like `spouses`, it only needs to be written on one of the two. The line between them is then drawn broken.
+- `godparents` (optional, e.g. `godparents: [rui-santos, ana-santos]`) names this person's padrinho and madrinha. Write it on the godchild only: the godparent's panel lists their afilhados by itself.
 - A gallery photo can name the other people in it with `with: [ana-santos, rui-santos]`; it then also shows among their photos.
 - `parents` and `spouses` list the file names of other people. You never list children: they follow from `parents`. A partner only needs to be written on one of the two people.
 - The text below the second `---` is Markdown, so `*italics*`, links and headings work.
@@ -49,7 +50,7 @@ The 14 people in `content/people` now are made-up samples. Delete them and their
 
 ## Editing in the site
 
-Select a person and use **Edit**, **Add a child**, **Add a partner**, **Add a parent** or **Add a brother or sister** at the bottom of their panel, or **Add a person** at the top left. Photos are shrunk in the browser before they are stored.
+Select a person and use **Edit**, **Add a child**, **Add a partner**, **Add a parent**, **Add a brother or sister**, **Add a godparent** or **Add a godchild** at the bottom of their panel, or **Add a person** at the top left. Photos are shrunk in the browser before they are stored.
 
 Without the online database (below) this is a trial: changes are kept in your browser only, and **Discard my changes** brings back the files.
 

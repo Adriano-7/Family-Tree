@@ -4,6 +4,7 @@ export type PersonLinks = Pick<Person, 'id' | 'name' | 'born' | 'parents' | 'spo
   died?: string | null
   families?: string[]
   separated?: string[]
+  godparents?: string[]
 }
 
 /** The same key for A+B and B+A. */
@@ -17,6 +18,8 @@ export interface Graph<T extends PersonLinks = Person> {
   spouses: Map<string, string[]>
   /** Couples who separated or divorced, by `pairKey`. */
   separated: Set<string>
+  /** The reverse of `godparents`: whose godparent each person is. */
+  godchildren: Map<string, string[]>
   /** 0 is the oldest generation. */
   generation: Map<string, number>
   generationCount: number
@@ -45,6 +48,9 @@ export function buildGraph<T extends PersonLinks>(people: T[]): Graph<T> {
     return (pa.born ?? '9999').localeCompare(pb.born ?? '9999') || pa.name.localeCompare(pb.name)
   }
   for (const list of children.values()) list.sort(byAge)
+  const godchildren = new Map<string, string[]>(people.map((p) => [p.id, []]))
+  for (const p of people) for (const g of p.godparents ?? []) if (g !== p.id) godchildren.get(g)?.push(p.id)
+  for (const list of godchildren.values()) list.sort(byAge)
   const spouses = new Map([...spouseSets].map(([id, set]) => [id, [...set].sort(byAge)]))
 
   assertNoAncestorLoop(people, byId)
@@ -86,7 +92,7 @@ export function buildGraph<T extends PersonLinks>(people: T[]): Graph<T> {
   }
   const generationCount = people.length ? Math.max(...generation.values()) + 1 : 0
 
-  return { people, byId, children, spouses, separated, generation, generationCount }
+  return { people, byId, children, spouses, separated, godchildren, generation, generationCount }
 }
 
 function assertNoAncestorLoop(people: PersonLinks[], byId: Map<string, PersonLinks>) {

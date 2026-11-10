@@ -18,6 +18,8 @@ export interface Person {
   spouses: string[]
   /** Partners (from `spouses`) this person separated or divorced from. Either of the two may list it. */
   separated: string[]
+  /** This person's godparents (padrinho, madrinha). Godchildren follow from it, as children do from `parents`. */
+  godparents: string[]
   /** The family sides that start with this person ("Machado"); their descendants belong to them too. */
   families: string[]
   thumb: string | null

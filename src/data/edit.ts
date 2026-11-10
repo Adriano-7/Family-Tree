@@ -13,6 +13,7 @@ export function emptyPerson(): Person {
     parents: [],
     spouses: [],
     separated: [],
+    godparents: [],
     families: [],
     thumb: null,
     portrait: null,
@@ -72,6 +73,7 @@ export function savePerson(people: Person[], person: Person): EditResult {
     spouses: [...new Set(person.spouses)].filter((s) => s !== person.id),
     // Only somebody who is (or was) a partner can be separated from.
     separated: [...new Set(person.separated ?? [])].filter((s) => s !== person.id && person.spouses.includes(s)),
+    godparents: [...new Set(person.godparents ?? [])].filter((g) => g !== person.id),
     families: cleanFamilies(person.families),
     gallery: person.gallery.map((g) => ({ ...g, with: [...new Set(g.with ?? [])].filter((x) => x !== person.id) })),
   }
@@ -111,13 +113,14 @@ export function deletePerson(people: Person[], id: string): EditResult {
     .filter((p) => p.id !== id)
     .map((other) => {
       const inPhotos = other.gallery.some((g) => g.with?.includes(id))
-      if (!other.parents.includes(id) && !other.spouses.includes(id) && !(other.separated ?? []).includes(id) && !inPhotos)
-        return other
+      const mentioned = [other.parents, other.spouses, other.separated ?? [], other.godparents ?? []].some((list) => list.includes(id))
+      if (!mentioned && !inPhotos) return other
       const updated = {
         ...other,
         parents: other.parents.filter((p) => p !== id),
         spouses: other.spouses.filter((s) => s !== id),
         separated: (other.separated ?? []).filter((s) => s !== id),
+        godparents: (other.godparents ?? []).filter((g) => g !== id),
         gallery: inPhotos ? other.gallery.map((g) => (g.with ? { ...g, with: g.with.filter((x) => x !== id) } : g)) : other.gallery,
       }
       changed.push(updated)
@@ -126,7 +129,7 @@ export function deletePerson(people: Person[], id: string): EditResult {
   return { people: next, changed }
 }
 
-export type Relative = 'child' | 'partner' | 'parent' | 'sibling'
+export type Relative = 'child' | 'partner' | 'parent' | 'sibling' | 'godparent' | 'godchild'
 
 /**
  * Who could be linked to this person as that relative without breaking the tree: not themselves,
@@ -144,6 +147,8 @@ export function linkCandidates(graph: Graph<Person>, id: string, relative: Relat
   return graph.people.filter((p) => {
     if (p.id === id) return false
     if (relative === 'partner') return !partners.has(p.id)
+    if (relative === 'godparent') return !(me.godparents ?? []).includes(p.id)
+    if (relative === 'godchild') return !(p.godparents ?? []).includes(id)
     if (line.has(p.id)) return false
     if (relative === 'child') return !children.has(p.id) && knownParents(p).length < 2
     if (relative === 'parent') return knownParents(me).length < 2
@@ -167,6 +172,8 @@ export function linkExisting(graph: Graph<Person>, mine: Person, relative: Relat
   const other = withAllPartners(graph, theirs)
   if (relative === 'partner') return { ...me, spouses: [...me.spouses, other.id] }
   if (relative === 'parent') return { ...me, parents: [...me.parents, other.id] }
+  if (relative === 'godparent') return { ...me, godparents: [...(me.godparents ?? []), other.id] }
+  if (relative === 'godchild') return { ...other, godparents: [...(other.godparents ?? []), me.id] }
   if (relative === 'sibling') return { ...other, parents: me.parents.filter((p) => graph.byId.has(p)) }
   // A child with no parents yet gets this person's partner too, as a new child would, when there is only one.
   const partners = graph.spouses.get(me.id) ?? []
