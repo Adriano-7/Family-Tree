@@ -1,7 +1,7 @@
 import type { Person } from '../data/types'
 
-const MONTH_YEAR = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })
-const FULL = new Intl.DateTimeFormat(undefined, { dateStyle: 'long', timeZone: 'UTC' })
+const MONTH_YEAR = new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+const FULL = new Intl.DateTimeFormat('pt-PT', { dateStyle: 'long', timeZone: 'UTC' })
 
 /** Accepts "1938", "1938-04" or "1938-04-12". */
 export function formatDate(value: string) {
