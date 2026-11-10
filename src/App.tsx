@@ -9,6 +9,7 @@ import { computeLayout } from './scene/layout'
 import { DISPLAY_FONT, LABEL_FONT } from './scene/textures'
 import { Filters } from './ui/Filters'
 import { useMediaQuery, useSelectedPerson } from './ui/hooks'
+import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
 import { PersonEditor } from './ui/PersonEditor'
 import { PersonPanel } from './ui/PersonPanel'
 import { Search } from './ui/Search'
@@ -50,13 +51,13 @@ export default function App() {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const wide = useMediaQuery('(min-width: 900px)')
   const fontsReady = useFontsReady()
-  const [explored, setExplored] = useState(false)
   const masthead = useRef<HTMLElement>(null)
-  // Beside the tree on a wide screen, above it on a narrow one.
+  const dock = useRef<HTMLElement>(null)
+  // What the tree should stay clear of: the controls below and, on a narrow screen, the title above.
   const inset = useCallback(() => {
-    const box = masthead.current?.getBoundingClientRect()
-    if (!box) return { left: 0, top: 0 }
-    return window.innerWidth >= 900 ? { left: box.right, top: 0 } : { left: 0, top: box.bottom }
+    const top = window.innerWidth >= 900 ? 0 : (masthead.current?.getBoundingClientRect().bottom ?? 0)
+    const bar = dock.current?.getBoundingClientRect()
+    return { top, bottom: bar ? window.innerHeight - bar.top : 0 }
   }, [])
 
   const load = useCallback(() => {
@@ -91,23 +92,27 @@ export default function App() {
   const home = graph.byId.get(HOME_PERSON)
   const sides = useMemo(() => familySides(graph), [graph])
 
-  // Generations are counted from whoever is open, otherwise from the home person.
-  const centre = selected ?? home
-  // Somebody opened from outside the chosen sides (a search, a link) is shown anyway.
+  // Somebody opened from outside what the filters show (a search, a link) is shown anyway.
   const selectedOutside = useMemo(() => {
-    if (!selected || !filter.sides.length) return false
-    const visible = visiblePeople(graph, filter, selected.id)
-    return !!visible && !visible.has(selected.id)
+    const visible = selected ? visiblePeople(graph, filter) : null
+    return !!selected && !!visible && !visible.has(selected.id)
   }, [graph, filter, selected])
   useEffect(() => {
-    if (selectedOutside) setFilter((f) => ({ ...f, sides: [] }))
+    if (selectedOutside) setFilter(NO_FILTER)
   }, [selectedOutside])
   const view = useMemo(() => {
-    const applied = selectedOutside ? { ...filter, sides: [] } : filter
-    const visible = visiblePeople(graph, applied, centre?.id ?? null)
+    const visible = visiblePeople(graph, selectedOutside ? NO_FILTER : filter)
     return visible ? buildGraph(graph.people.filter((p) => visible.has(p.id))) : graph
-  }, [graph, filter, selectedOutside, centre?.id])
+  }, [graph, filter, selectedOutside])
   const layout = useMemo(() => computeLayout(view), [view])
+  // Choosing a filter that hides the open person closes that person, so the choice is not undone.
+  const changeFilter = (next: Filter) => {
+    if (selected && !editing) {
+      const visible = visiblePeople(graph, next)
+      if (visible && !visible.has(selected.id)) select(null)
+    }
+    setFilter(next)
+  }
   const homeIds = useMemo(() => [...household(graph, HOME_PERSON)], [graph])
 
   useEffect(() => {
@@ -151,7 +156,7 @@ export default function App() {
   }
 
   return (
-    <div className="app" onPointerDown={() => setExplored(true)}>
+    <div className={selected || editing ? 'app with-panel' : 'app'}>
       {fontsReady && count > 0 && (
         <Constellation
           graph={view}
@@ -172,63 +177,13 @@ export default function App() {
 
       <header className="masthead" ref={masthead}>
         <h1>{strings.title}</h1>
-        <p>
-          {people === null
-            ? loadFailed
-              ? strings.loadFailed
-              : strings.loading
-            : count
-              ? view === graph
-                ? strings.summary(count, graph.generationCount)
-                : strings.summaryFiltered(view.people.length, count)
-              : strings.empty}
-        </p>
+        {count === 0 && (
+          <p>{people === null ? (loadFailed ? strings.loadFailed : strings.loading) : strings.empty}</p>
+        )}
         {count > 0 && <Search people={graph.people} onSelect={(id) => !editing && select(id)} />}
-        {count > 0 && (
-          <Filters
-            sides={sides}
-            filter={filter}
-            onChange={setFilter}
-            centreName={centre ? centre.name.split(' ')[0] : null}
-            compact={!wide}
-          />
-        )}
-        {people !== null && (
-          <div className="masthead-actions">
-            {home && (
-              <button
-                type="button"
-                className="quiet"
-                onClick={() => {
-                  if (!editing) select(null)
-                  setFilter(NO_FILTER)
-                  setHomeRequest((n) => n + 1)
-                }}
-              >
-                {strings.myFamily}
-              </button>
-            )}
-            {count > 0 && (
-              <button
-                type="button"
-                className="quiet"
-                onClick={() => {
-                  if (!editing) select(null)
-                  setFilter(NO_FILTER)
-                  setOverviewRequest((n) => n + 1)
-                }}
-              >
-                {strings.wholeTree}
-              </button>
-            )}
-            <button type="button" className="quiet" disabled={!!editing} onClick={() => startAdd()}>
-              {strings.addPerson}
-            </button>
-          </div>
-        )}
         {trialChanges && (
           <p className="trial">
-            {strings.trialNotice}{' '}
+            {strings.trialNotice}
             <button
               type="button"
               className="quiet"
@@ -245,24 +200,52 @@ export default function App() {
         )}
       </header>
 
-      {count > 0 && (
-        <footer className="key">
-          {!explored && !selected && !editing && <p className="hint">{strings.hint}</p>}
-          <ul>
-            <li>
-              <span className="swatch generations" />
-              {strings.legendOldest} to {strings.legendYoungest}
-            </li>
-            <li>
-              <span className="swatch line parent" />
-              {strings.legendParent}
-            </li>
-            <li>
-              <span className="swatch line partner" />
-              {strings.legendPartner}
-            </li>
-          </ul>
-        </footer>
+      {people !== null && (
+        <nav className="dock" ref={dock} aria-label={strings.dock}>
+          {home && (
+            <button
+              type="button"
+              className="icon"
+              aria-label={strings.myFamily}
+              title={strings.myFamily}
+              onClick={() => {
+                if (!editing) select(null)
+                setFilter(NO_FILTER)
+                setHomeRequest((n) => n + 1)
+              }}
+            >
+              <HomeIcon />
+            </button>
+          )}
+          {count > 0 && (
+            <>
+              <button
+                type="button"
+                className="icon"
+                aria-label={strings.wholeTree}
+                title={strings.wholeTree}
+                onClick={() => {
+                  if (!editing) select(null)
+                  setFilter(NO_FILTER)
+                  setOverviewRequest((n) => n + 1)
+                }}
+              >
+                <WholeTreeIcon />
+              </button>
+              <Filters sides={sides} generationCount={graph.generationCount} filter={filter} onChange={changeFilter} />
+            </>
+          )}
+          <button
+            type="button"
+            className="icon"
+            aria-label={strings.addPerson}
+            title={strings.addPerson}
+            disabled={!!editing}
+            onClick={() => startAdd()}
+          >
+            <PlusIcon />
+          </button>
+        </nav>
       )}
 
       {editing ? (

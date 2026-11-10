@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, siblings, visiblePeople, withinGenerations } from '../src/data/graph'
+import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, siblings, visiblePeople } from '../src/data/graph'
 import { computeLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -190,20 +190,21 @@ describe('family sides and filters', () => {
     expect(household(g, 'nobody').size).toBe(0)
   })
 
-  it('keeps the generations around a person', () => {
+  it('keeps the oldest generations', () => {
     const g = buildGraph(people())
-    expect([...withinGenerations(g, 'me', 1)].sort()).toEqual(['aunt', 'brother', 'dad', 'in-law', 'kid', 'me', 'mum', 'uncle'])
-    expect(withinGenerations(g, 'me', 0).has('mum')).toBe(false)
+    expect([...oldestGenerations(g, 1)].sort()).toEqual(['grandma', 'grandpa', 'nonno'])
+    expect([...oldestGenerations(g, 2)].sort()).toEqual(['aunt', 'dad', 'grandma', 'grandpa', 'in-law', 'mum', 'nonno', 'uncle'])
   })
 
   it('combines the filters, and lays out what is left', () => {
     const g = buildGraph(people())
-    expect(visiblePeople(g, { sides: [], generations: null }, 'me')).toBeNull()
-    expect(visiblePeople(g, { sides: ['Santos', 'Silva', 'Machado'], generations: null }, 'me')).toBeNull()
-    const visible = visiblePeople(g, { sides: ['Machado'], generations: 1 }, 'me')!
-    expect([...visible].sort()).toEqual(['aunt', 'brother', 'dad', 'kid', 'me', 'mum'])
+    expect(visiblePeople(g, { sides: [], generations: null })).toBeNull()
+    expect(visiblePeople(g, { sides: ['Santos', 'Silva', 'Machado'], generations: null })).toBeNull()
+    expect(visiblePeople(g, { sides: [], generations: 4 })).toBeNull()
+    const visible = visiblePeople(g, { sides: ['Machado'], generations: 2 })!
+    expect([...visible].sort()).toEqual(['aunt', 'dad', 'mum', 'nonno'])
     const sub = buildGraph(g.people.filter((p) => visible.has(p.id)))
     expect(sub.byId.get('mum')!.parents).toEqual(['grandpa', 'grandma'])
-    expect(computeLayout(sub).positions.size).toBe(6)
+    expect(computeLayout(sub).positions.size).toBe(4)
   })
 })

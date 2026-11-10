@@ -155,30 +155,28 @@ export function familySides(graph: Graph<PersonLinks>): FamilySide[] {
     })
 }
 
-/** Everybody at most `n` generations above or below this person. */
-export function withinGenerations(graph: Graph<PersonLinks>, id: string, n: number): Set<string> {
-  const centre = graph.generation.get(id)
-  if (centre === undefined) return new Set(graph.people.map((p) => p.id))
-  return new Set(graph.people.filter((p) => Math.abs(graph.generation.get(p.id)! - centre) <= n).map((p) => p.id))
+/** Everybody in the oldest `n` generations of the tree. */
+export function oldestGenerations(graph: Graph<PersonLinks>, n: number): Set<string> {
+  return new Set(graph.people.filter((p) => graph.generation.get(p.id)! < n).map((p) => p.id))
 }
 
 export interface Filter {
   /** Names of the family sides to show; empty shows every side. */
   sides: string[]
-  /** How many generations above and below `centreId` to show; null shows all. */
+  /** How many generations to show, counting down from the oldest; null shows all. */
   generations: number | null
 }
 
 /** The people a filter leaves on show, or null when it hides nobody. */
-export function visiblePeople(graph: Graph<PersonLinks>, filter: Filter, centreId: string | null): Set<string> | null {
+export function visiblePeople(graph: Graph<PersonLinks>, filter: Filter): Set<string> | null {
   let visible: Set<string> | null = null
   if (filter.sides.length) {
     visible = new Set()
     for (const side of familySides(graph)) if (filter.sides.includes(side.name)) for (const id of side.shown) visible.add(id)
   }
-  if (filter.generations !== null && centreId && graph.byId.has(centreId)) {
-    const near = withinGenerations(graph, centreId, filter.generations)
-    visible = visible ? new Set([...visible].filter((id) => near.has(id))) : near
+  if (filter.generations !== null) {
+    const oldest = oldestGenerations(graph, filter.generations)
+    visible = visible ? new Set([...visible].filter((id) => oldest.has(id))) : oldest
   }
   return visible && visible.size < graph.people.length ? visible : null
 }

@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import type { Person } from '../data/types'
 import { fold, lifeYears } from './format'
+import { SearchIcon } from './icons'
 import { strings } from './strings'
 
 interface Props {
@@ -32,6 +33,7 @@ export function Search({ people, onSelect }: Props) {
 
   return (
     <div className="search" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}>
+      <SearchIcon />
       <input
         ref={input}
         type="search"

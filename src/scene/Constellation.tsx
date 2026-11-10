@@ -26,8 +26,8 @@ interface Props {
   /** Generations in the complete tree, so a star keeps its colour while others are hidden. */
   generation: Map<string, number>
   generationCount: number
-  /** Pixels of the view taken by the title and filters, which the tree should stay clear of. */
-  inset: () => { left: number; top: number }
+  /** Pixels at the top and bottom of the view taken by the controls, which the tree should stay clear of. */
+  inset: () => { top: number; bottom: number }
 }
 
 const SKY = '#000000'
@@ -88,17 +88,17 @@ function Scene({
     const ys = all.map((p) => p[1])
     const [left, right, bottom, top] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2))
-    // The people go in the part of the view that the title and filters leave free.
+    // The people go in the part of the view that the controls leave free.
     const { width, height } = sizeRef.current
     const covered = inset()
-    const free = { x: Math.max(0.4, 1 - covered.left / width), y: Math.max(0.4, 1 - covered.top / height) }
+    const free = Math.max(0.4, 1 - (covered.top + covered.bottom) / height)
     const distance = Math.max(
       CLOSEST_FRAME,
-      ((right - left) / 2 + 3.5) / (tan * (width / height) * free.x),
-      ((top - bottom) / 2 + 4) / (tan * free.y),
+      ((right - left) / 2 + 3.5) / (tan * (width / height)),
+      ((top - bottom) / 2 + 3.2) / (tan * free),
     )
-    const x = (left + right) / 2 - (1 - free.x) * distance * tan * (width / height)
-    const y = (top + bottom) / 2 + (1 - free.y) * distance * tan
+    const x = (left + right) / 2
+    const y = (top + bottom) / 2 + ((covered.top - covered.bottom) / height) * distance * tan
     void controls.current?.setLookAt(x, y, distance, x, y, 0, animate)
   }
 
