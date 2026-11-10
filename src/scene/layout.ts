@@ -1,4 +1,4 @@
-import type { Graph, PersonLinks } from '../data/graph'
+import { type Graph, partnershipEnd, type PersonLinks } from '../data/graph'
 
 export type Vec3 = [number, number, number]
 
@@ -12,6 +12,8 @@ export interface Segment {
   parents: string[]
   /** The children this piece of line leads to. */
   children: string[]
+  /** For a partner line: how the partnership ended, if it did. */
+  ended?: 'separated' | 'widowed'
 }
 
 export interface Layout {
@@ -245,7 +247,7 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
   const line = (
     from: [number, number],
     to: [number, number],
-    info: Pick<Segment, 'kind' | 'parents' | 'children' | 'far'>,
+    info: Pick<Segment, 'kind' | 'parents' | 'children' | 'far' | 'ended'>,
   ) => {
     segments.push({ a: at(...from), b: at(...to), ...info })
   }
@@ -306,7 +308,14 @@ export function computeLayout(graph: Graph<PersonLinks>): Layout {
 
   for (const id of ids)
     for (const partner of graph.spouses.get(id)!)
-      if (id < partner) line(flat.get(id)!, flat.get(partner)!, { kind: 'partner', parents: [id, partner], children: [] })
+      if (id < partner)
+        line(flat.get(id)!, flat.get(partner)!, {
+          kind: 'partner',
+          parents: [id, partner],
+          // The couple's children: their line drops from the middle of this one.
+          children: families.get([id, partner].sort().join('+'))?.children ?? [],
+          ended: partnershipEnd(graph, id, partner) ?? undefined,
+        })
 
   return { positions, segments, width, height: (graph.generationCount - 1) * LAYER_GAP }
 }

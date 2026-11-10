@@ -856,6 +856,81 @@ button:disabled {
   color: var(--paper);
 }
 
+.chosen .tag-toggle {
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--haze);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.chosen .tag-toggle[aria-pressed='true'] {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: #000;
+}
+
+.add-relative {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.add-relative-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+}
+
+.add-relative input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--paper);
+  font: inherit;
+}
+
+.add-relative input:focus {
+  outline: none;
+  border-color: var(--paper);
+}
+
+.add-relative-list {
+  margin-top: 0.4rem;
+}
+
+.add-relative-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.add-relative-list li[aria-selected='true'] {
+  background: var(--wash);
+}
+
+.add-relative-list .years {
+  color: var(--haze);
+  font-variant-numeric: tabular-nums;
+}
+
+.add-relative-list .create {
+  color: var(--haze);
+}
+
+.add-relative-list .create[aria-selected='true'] {
+  color: var(--paper);
+}
+
 .picker-input {
   position: relative;
 }

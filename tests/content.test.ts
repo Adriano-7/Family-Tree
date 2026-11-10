@@ -30,7 +30,7 @@ describe('build-content', () => {
   it('builds people, text and photos', () => {
     const r = build({
       'people/ana.md': '---\nname: Ana\nborn: 1938-04-12\ndied: 2015\nportrait: me.svg\ngallery:\n  - file: me.svg\n    caption: Hello\n---\n\nSome *text*.',
-      'people/rui.md': '---\nname: Rui\nparents: [ana]\nfamilies: [Santos]\n---\n',
+      'people/rui.md': '---\nname: Rui\nparents: [ana]\nfamilies: [Santos]\nseparated: [ana]\n---\n',
       'photos/ana/me.svg': svg,
     })
     expect(r.stderr).toBe('')
@@ -42,6 +42,7 @@ describe('build-content', () => {
     expect(r.people.find((p: { id: string }) => p.id === 'rui').parents).toEqual(['ana'])
     expect(r.people.find((p: { id: string }) => p.id === 'rui').families).toEqual(['Santos'])
     expect(ana.families).toEqual([])
+    expect(r.people.find((p: { id: string }) => p.id === 'rui').separated).toEqual(['ana'])
   })
 
   it('names the file when a parent does not exist', () => {

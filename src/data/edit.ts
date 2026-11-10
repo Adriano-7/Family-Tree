@@ -1,4 +1,4 @@
-import { buildGraph } from './graph'
+import { buildGraph, type Graph, lineage, pairKey, siblings } from './graph'
 import type { Person } from './types'
 
 export const DATE_PATTERN = /^\d{4}(-\d{2}(-\d{2})?)?$/
@@ -12,6 +12,7 @@ export function emptyPerson(): Person {
     birthplace: null,
     parents: [],
     spouses: [],
+    separated: [],
     families: [],
     thumb: null,
     portrait: null,
@@ -69,6 +70,8 @@ export function savePerson(people: Person[], person: Person): EditResult {
     name: person.name.trim(),
     parents: [...new Set(person.parents)].filter((p) => p !== person.id),
     spouses: [...new Set(person.spouses)].filter((s) => s !== person.id),
+    // Only somebody who is (or was) a partner can be separated from.
+    separated: [...new Set(person.separated ?? [])].filter((s) => s !== person.id && person.spouses.includes(s)),
     families: cleanFamilies(person.families),
   }
   if (!clean.name) throw new EditError('name')
@@ -76,9 +79,16 @@ export function savePerson(people: Person[], person: Person): EditResult {
 
   const changed = [clean]
   const next = people.filter((p) => p.id !== clean.id).map((other) => {
-    // Somebody who used to be a partner must stop pointing back.
-    if (other.spouses.includes(clean.id) && !clean.spouses.includes(other.id)) {
-      const updated = { ...other, spouses: other.spouses.filter((s) => s !== clean.id) }
+    // Somebody who used to be a partner must stop pointing back, and a separation
+    // taken away on one side must go on the other too.
+    const dropPartner = other.spouses.includes(clean.id) && !clean.spouses.includes(other.id)
+    const dropSeparation = (other.separated ?? []).includes(clean.id) && !clean.separated.includes(other.id)
+    if (dropPartner || dropSeparation) {
+      const updated = {
+        ...other,
+        spouses: dropPartner ? other.spouses.filter((s) => s !== clean.id) : other.spouses,
+        separated: (other.separated ?? []).filter((s) => s !== clean.id),
+      }
       changed.push(updated)
       return updated
     }
@@ -99,14 +109,63 @@ export function deletePerson(people: Person[], id: string): EditResult {
   const next = people
     .filter((p) => p.id !== id)
     .map((other) => {
-      if (!other.parents.includes(id) && !other.spouses.includes(id)) return other
+      if (!other.parents.includes(id) && !other.spouses.includes(id) && !(other.separated ?? []).includes(id)) return other
       const updated = {
         ...other,
         parents: other.parents.filter((p) => p !== id),
         spouses: other.spouses.filter((s) => s !== id),
+        separated: (other.separated ?? []).filter((s) => s !== id),
       }
       changed.push(updated)
       return updated
     })
   return { people: next, changed }
+}
+
+export type Relative = 'child' | 'partner' | 'parent' | 'sibling'
+
+/**
+ * Who could be linked to this person as that relative without breaking the tree: not themselves,
+ * not their own ancestors or descendants (for a child, parent or sibling), nobody already linked
+ * that way, and nobody who already has two parents (as a child) or other parents (as a sibling).
+ */
+export function linkCandidates(graph: Graph<Person>, id: string, relative: Relative): Person[] {
+  const me = graph.byId.get(id)
+  if (!me) return []
+  const line = lineage(graph, id).line
+  const knownParents = (p: Person) => p.parents.filter((x) => graph.byId.has(x))
+  const partners = new Set(graph.spouses.get(id) ?? [])
+  const children = new Set(graph.children.get(id) ?? [])
+  const brothers = new Set(siblings(graph, id))
+  return graph.people.filter((p) => {
+    if (p.id === id) return false
+    if (relative === 'partner') return !partners.has(p.id)
+    if (line.has(p.id)) return false
+    if (relative === 'child') return !children.has(p.id) && knownParents(p).length < 2
+    if (relative === 'parent') return knownParents(me).length < 2
+    return !brothers.has(p.id) && knownParents(p).length === 0
+  })
+}
+
+/**
+ * A record with every partner and separation written on it, including those only the other
+ * person wrote down. `savePerson` reads a record's partners as the complete list, so a record
+ * changed for another reason must carry them all, or the missing ones would be dropped.
+ */
+export function withAllPartners(graph: Graph<Person>, p: Person): Person {
+  const spouses = [...new Set([...p.spouses, ...(graph.spouses.get(p.id) ?? [])])]
+  return { ...p, spouses, separated: spouses.filter((s) => graph.separated.has(pairKey(p.id, s))) }
+}
+
+/** The one record to change so that `other` becomes this relative of `me`. */
+export function linkExisting(graph: Graph<Person>, mine: Person, relative: Relative, theirs: Person): Person {
+  const me = withAllPartners(graph, mine)
+  const other = withAllPartners(graph, theirs)
+  if (relative === 'partner') return { ...me, spouses: [...me.spouses, other.id] }
+  if (relative === 'parent') return { ...me, parents: [...me.parents, other.id] }
+  if (relative === 'sibling') return { ...other, parents: me.parents.filter((p) => graph.byId.has(p)) }
+  // A child with no parents yet gets this person's partner too, as a new child would, when there is only one.
+  const partners = graph.spouses.get(me.id) ?? []
+  const known = other.parents.filter((p) => graph.byId.has(p))
+  return { ...other, parents: known.length === 0 && partners.length === 1 ? [me.id, partners[0]] : [...known, me.id] }
 }

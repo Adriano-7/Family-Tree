@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
-import { type Graph, siblings } from '../data/graph'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { linkCandidates, type Relative } from '../data/edit'
+import { type Graph, partnershipEnd, siblings } from '../data/graph'
 import type { Person } from '../data/types'
 import { initialsOf } from '../scene/textures'
 import { asset, lifeDates, lifeYears } from './format'
 import { renderBio } from './bio'
+import { AddRelative } from './AddRelative'
 import { Gallery } from './Gallery'
 import { personHref } from './hooks'
 import { strings } from './strings'
@@ -13,7 +15,10 @@ interface Props {
   person: Person
   onClose: () => void
   onEdit: () => void
-  onAdd: (relative: 'child' | 'partner' | 'parent' | 'sibling') => void
+  /** Start a new person who will be this relative, with the name typed so far. */
+  onAdd: (relative: Relative, name: string) => void
+  /** Make somebody already in the tree this relative. */
+  onLink: (relative: Relative, id: string) => Promise<void>
   /** The family sides this person belongs to. */
   sides: string[]
   onShowSide: (name: string) => void
@@ -23,7 +28,18 @@ interface Props {
   onRelate: () => void
 }
 
-function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph: Props['graph'] }) {
+function Relatives({
+  title,
+  ids,
+  graph,
+  note,
+}: {
+  title: string
+  ids: string[]
+  graph: Props['graph']
+  /** A word about each person, after their years. */
+  note?: (id: string) => string | null
+}) {
   const people = ids.map((id) => graph.byId.get(id)).filter((p): p is Person => !!p)
   if (!people.length) return null
   return (
@@ -42,7 +58,7 @@ function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph:
               )}
               <span>
                 {p.name}
-                <small>{lifeYears(p)}</small>
+                <small>{[lifeYears(p), note?.(p.id)].filter(Boolean).join(' · ')}</small>
               </span>
             </a>
           </li>
@@ -52,7 +68,7 @@ function Relatives({ title, ids, graph }: { title: string; ids: string[]; graph:
   )
 }
 
-export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onShowSide, onShowLine, onRelate }: Props) {
+export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sides, onShowSide, onShowLine, onRelate }: Props) {
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -61,11 +77,14 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onSh
   }, [person.id])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const [adding, setAdding] = useState<Relative | null>(null)
+  useEffect(() => setAdding(null), [person.id])
+  const candidates = useMemo(() => (adding ? linkCandidates(graph, person.id, adding) : []), [graph, person.id, adding])
   const dates = lifeDates(person)
   const partners = graph.spouses.get(person.id) ?? []
   const parentCount = person.parents.filter((p) => graph.byId.has(p)).length
@@ -108,30 +127,54 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, sides, onSh
           </section>
         )}
         <Relatives title={strings.parents} ids={person.parents} graph={graph} />
-        <Relatives title={partners.length > 1 ? strings.partners : strings.partner} ids={partners} graph={graph} />
+        <Relatives
+          title={partners.length > 1 ? strings.partners : strings.partner}
+          ids={partners}
+          graph={graph}
+          note={(id) => {
+            const end = partnershipEnd(graph, person.id, id)
+            if (end === 'separated') return strings.separatedNote
+            // Said of whoever lives on: under the partner's name when they are the one still alive.
+            return end === 'widowed' && !graph.byId.get(id)?.died ? strings.widowedNote : null
+          }}
+        />
         <Relatives title={strings.children} ids={graph.children.get(person.id) ?? []} graph={graph} />
         <Relatives title={strings.siblings} ids={siblings(graph, person.id)} graph={graph} />
-        <div className="edit-actions">
-          <button type="button" className="button" onClick={onEdit}>
-            {strings.edit}
-          </button>
-          <button type="button" className="quiet" onClick={() => onAdd('child')}>
-            {strings.addChild}
-          </button>
-          <button type="button" className="quiet" onClick={() => onAdd('partner')}>
-            {strings.addPartner}
-          </button>
-          {parentCount < 2 && (
-            <button type="button" className="quiet" onClick={() => onAdd('parent')}>
-              {strings.addParent}
+        {adding ? (
+          <AddRelative
+            key={adding}
+            relative={adding}
+            candidates={candidates}
+            onLink={async (id) => {
+              await onLink(adding, id)
+              setAdding(null)
+            }}
+            onCreate={(name) => onAdd(adding, name)}
+            onCancel={() => setAdding(null)}
+          />
+        ) : (
+          <div className="edit-actions">
+            <button type="button" className="button" onClick={onEdit}>
+              {strings.edit}
             </button>
-          )}
-          {parentCount > 0 && (
-            <button type="button" className="quiet" onClick={() => onAdd('sibling')}>
-              {strings.addSibling}
+            <button type="button" className="quiet" onClick={() => setAdding('child')}>
+              {strings.addChild}
             </button>
-          )}
-        </div>
+            <button type="button" className="quiet" onClick={() => setAdding('partner')}>
+              {strings.addPartner}
+            </button>
+            {parentCount < 2 && (
+              <button type="button" className="quiet" onClick={() => setAdding('parent')}>
+                {strings.addParent}
+              </button>
+            )}
+            {parentCount > 0 && (
+              <button type="button" className="quiet" onClick={() => setAdding('sibling')}>
+                {strings.addSibling}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )

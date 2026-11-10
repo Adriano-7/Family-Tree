@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { deletePerson, EditError, emptyPerson, savePerson, slugFor } from '../src/data/edit'
+import { deletePerson, EditError, emptyPerson, linkCandidates, linkExisting, savePerson, slugFor } from '../src/data/edit'
+import { buildGraph } from '../src/data/graph'
 
 const person = (id: string, more: Partial<ReturnType<typeof emptyPerson>> = {}) => ({ ...emptyPerson(), id, name: id, ...more })
 
@@ -58,6 +59,22 @@ describe('family sides', () => {
   })
 })
 
+describe('separations', () => {
+  it('keeps only partners as separated, and clears a separation on both sides', () => {
+    const start = [person('a', { spouses: ['b'] }), person('b', { separated: ['a'] })]
+    const kept = savePerson(start, person('a', { spouses: ['b'], separated: ['b', 'z'] }))
+    expect(kept.people.find((p) => p.id === 'a')!.separated).toEqual(['b'])
+    const undone = savePerson(start, person('a', { spouses: ['b'], separated: [] }))
+    expect(undone.people.find((p) => p.id === 'b')!.separated).toEqual([])
+    expect(undone.changed.map((p) => p.id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('forgets a deleted person in separations too', () => {
+    const { people } = deletePerson([person('a'), person('b', { separated: ['a'] })], 'a')
+    expect(people[0].separated).toEqual([])
+  })
+})
+
 describe('deletePerson', () => {
   it('removes the person and every mention of them', () => {
     const start = [person('a', { spouses: ['b'] }), person('b'), person('c', { parents: ['a', 'b'] })]
@@ -65,5 +82,50 @@ describe('deletePerson', () => {
     expect(people.map((p) => p.id)).toEqual(['b', 'c'])
     expect(people.find((p) => p.id === 'c')!.parents).toEqual(['b'])
     expect(changed.map((p) => p.id)).toEqual(['c'])
+  })
+})
+
+describe('linking somebody already in the tree', () => {
+  const family = () => [
+    person('grandma'),
+    person('mum', { parents: ['grandma'], spouses: ['dad'] }),
+    person('dad'),
+    person('me', { parents: ['mum', 'dad'] }),
+    person('loner'),
+    person('cousin', { parents: ['aunt', 'uncle'] }),
+    person('aunt'),
+    person('uncle'),
+  ]
+  const ids = (list: { id: string }[]) => list.map((p) => p.id).sort()
+
+  it('offers only people who fit', () => {
+    const g = buildGraph(family())
+    // Not an ancestor, not somebody with two parents already.
+    expect(ids(linkCandidates(g, 'mum', 'child'))).toEqual(['aunt', 'dad', 'loner', 'uncle'])
+    // Not a descendant; and "me" already has two parents, so nobody is offered.
+    expect(ids(linkCandidates(g, 'me', 'parent'))).toEqual([])
+    expect(ids(linkCandidates(g, 'mum', 'partner'))).not.toContain('dad')
+    // A sibling must have no parents of their own yet, and cannot be one of my parents.
+    expect(ids(linkCandidates(g, 'me', 'sibling'))).toEqual(['aunt', 'loner', 'uncle'])
+  })
+
+  it('changes the one record that makes the link', () => {
+    const people = family()
+    const g = buildGraph(people)
+    const get = (id: string) => people.find((p) => p.id === id)!
+    // A child with no parents gets both, when there is just one partner.
+    expect(linkExisting(g, get('mum'), 'child', get('loner'))).toMatchObject({ id: 'loner', parents: ['mum', 'dad'] })
+    expect(linkExisting(g, get('loner'), 'partner', get('aunt'))).toMatchObject({ id: 'loner', spouses: ['aunt'] })
+    expect(linkExisting(g, get('loner'), 'parent', get('aunt'))).toMatchObject({ id: 'loner', parents: ['aunt'] })
+    expect(linkExisting(g, get('me'), 'sibling', get('loner'))).toMatchObject({ id: 'loner', parents: ['mum', 'dad'] })
+  })
+
+  it('keeps partners only the other person wrote down', () => {
+    const people = [person('eliseu'), person('alexandra', { spouses: ['eliseu'], separated: ['eliseu'] }), person('adao')]
+    const g = buildGraph(people)
+    const get = (id: string) => people.find((p) => p.id === id)!
+    const result = savePerson(people, linkExisting(g, get('eliseu'), 'parent', get('adao')))
+    expect(result.people.find((p) => p.id === 'eliseu')).toMatchObject({ parents: ['adao'], spouses: ['alexandra'] })
+    expect(result.people.find((p) => p.id === 'alexandra')).toMatchObject({ spouses: ['eliseu'], separated: ['eliseu'] })
   })
 })

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { deletePerson, emptyPerson, savePerson } from './data/edit'
+import { deletePerson, EditError, emptyPerson, linkExisting, type Relative, savePerson, withAllPartners } from './data/edit'
 import { HOME_PERSON } from './config'
-import { buildGraph, familySides, type Filter, household, lineage, relation, relatives, visiblePeople } from './data/graph'
+import { buildGraph, familySides, type Filter, household, lineage, pairKey, relation, relatives, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
 import type { Person } from './data/types'
 import Constellation from './scene/Constellation'
@@ -198,7 +198,10 @@ export default function App() {
     setRelatingFrom(null)
   }
   const firstName = (id: string) => graph.byId.get(id)?.name.split(' ')[0] ?? ''
-  const kin = related && kinshipName(related)
+  const kin =
+    related && focus?.kind === 'relation' && related.partners && graph.separated.has(pairKey(focus.from, focus.to))
+      ? strings.exPartner
+      : related && kinshipName(related)
 
   useEffect(() => {
     try {
@@ -230,8 +233,8 @@ export default function App() {
     document.title = selected ? `${selected.name} – ${strings.title}` : strings.title
   }, [selected])
 
-  const startAdd = (relative?: 'child' | 'partner' | 'parent' | 'sibling') => {
-    const person = emptyPerson()
+  const startAdd = (relative?: Relative, name = '') => {
+    const person = { ...emptyPerson(), name }
     if (!selected || !relative) return setEditing({ person })
     if (relative === 'child') {
       const partners = graph.spouses.get(selected.id) ?? []
@@ -241,12 +244,27 @@ export default function App() {
     setEditing({ person, childId: relative === 'parent' ? selected.id : undefined })
   }
 
+  /** Makes somebody already in the tree a relative of the open person. */
+  const link = async (relative: Relative, otherId: string) => {
+    const other = people?.find((p) => p.id === otherId)
+    if (!selected || !other || !people) return
+    let result
+    try {
+      result = savePerson(people, linkExisting(graph, selected, relative, other))
+    } catch (e) {
+      throw e instanceof EditError && e.reason === 'loop' ? new Error(strings.errorLoop) : e
+    }
+    await store.save(result.changed)
+    setPeople(result.people)
+    setTrialChanges(store.hasLocalChanges?.() ?? false)
+  }
+
   const commit = async (person: Person) => {
     let result = savePerson(people ?? [], person)
     const changed = [...result.changed]
     const child = editing?.childId ? result.people.find((p) => p.id === editing.childId) : undefined
     if (child) {
-      result = savePerson(result.people, { ...child, parents: [...child.parents, person.id] })
+      result = savePerson(result.people, { ...withAllPartners(graph, child), parents: [...child.parents, person.id] })
       changed.push(...result.changed)
     }
     await store.save(changed)
@@ -441,6 +459,7 @@ export default function App() {
             onClose={() => select(null)}
             onEdit={() => setEditing({ person: selected })}
             onAdd={startAdd}
+            onLink={link}
             sides={sides.filter((s) => s.line.has(selected.id)).map((s) => s.name)}
             onShowSide={(name) => {
               changeFilter({ ...filter, sides: [name] })

@@ -93,6 +93,7 @@ for (const file of files) {
     birthplace: d.birthplace ? String(d.birthplace) : null,
     parents: idList(d.parents, 'parents', label),
     spouses: idList(d.spouses, 'spouses', label),
+    separated: idList(d.separated, 'separated', label),
     families: nameList(d.families, 'families', label),
     portrait: d.portrait ? String(d.portrait) : null,
     gallery,
@@ -104,7 +105,7 @@ for (const file of files) {
 
 const byId = new Map(raw.map((p) => [p.id, p]))
 for (const p of raw) {
-  for (const field of ['parents', 'spouses']) {
+  for (const field of ['parents', 'spouses', 'separated']) {
     for (const other of p[field]) {
       if (other === p.id) fail(p.label, `lists themselves in "${field}"`)
       else if (!byId.has(other)) fail(p.label, `"${field}" mentions "${other}", but content/people/${other}.md does not exist`)
@@ -154,6 +155,7 @@ for (const p of raw) {
     birthplace: p.birthplace,
     parents: p.parents,
     spouses: p.spouses,
+    separated: p.separated,
     families: p.families,
     thumb: null,
     portrait: null,

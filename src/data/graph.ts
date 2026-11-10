@@ -1,13 +1,22 @@
 import type { Person } from './types'
 
-export type PersonLinks = Pick<Person, 'id' | 'name' | 'born' | 'parents' | 'spouses'> & { families?: string[] }
+export type PersonLinks = Pick<Person, 'id' | 'name' | 'born' | 'parents' | 'spouses'> & {
+  died?: string | null
+  families?: string[]
+  separated?: string[]
+}
+
+/** The same key for A+B and B+A. */
+export const pairKey = (a: string, b: string) => (a < b ? `${a}+${b}` : `${b}+${a}`)
 
 export interface Graph<T extends PersonLinks = Person> {
   people: T[]
   byId: Map<string, T>
   children: Map<string, string[]>
-  /** Symmetric: if A lists B as a spouse, B also has A. */
+  /** Symmetric: if A lists B as a spouse, B also has A. Includes former partners. */
   spouses: Map<string, string[]>
+  /** Couples who separated or divorced, by `pairKey`. */
+  separated: Set<string>
   /** 0 is the oldest generation. */
   generation: Map<string, number>
   generationCount: number
@@ -20,12 +29,15 @@ export function buildGraph<T extends PersonLinks>(people: T[]): Graph<T> {
 
   for (const p of people) {
     for (const parent of p.parents) children.get(parent)?.push(p.id)
-    for (const s of p.spouses) {
+    // Somebody listed only as separated from is still a (former) partner.
+    for (const s of [...p.spouses, ...(p.separated ?? [])]) {
       if (!byId.has(s) || s === p.id) continue
       spouseSets.get(p.id)!.add(s)
       spouseSets.get(s)!.add(p.id)
     }
   }
+  const separated = new Set<string>()
+  for (const p of people) for (const s of p.separated ?? []) if (byId.has(s) && s !== p.id) separated.add(pairKey(p.id, s))
 
   const byAge = (a: string, b: string) => {
     const pa = byId.get(a)!
@@ -53,7 +65,7 @@ export function buildGraph<T extends PersonLinks>(people: T[]): Graph<T> {
   }
   const generationCount = people.length ? Math.max(...generation.values()) + 1 : 0
 
-  return { people, byId, children, spouses, generation, generationCount }
+  return { people, byId, children, spouses, separated, generation, generationCount }
 }
 
 function assertNoAncestorLoop(people: PersonLinks[], byId: Map<string, PersonLinks>) {
@@ -261,4 +273,14 @@ export function relatives(graph: Graph<PersonLinks>, id: string): Set<string> {
   for (const s of graph.spouses.get(id) ?? []) out.add(s)
   out.delete(id)
   return out
+}
+
+/**
+ * How a couple's partnership ended, if it did: separated or divorced, or one of them has died
+ * and the other lives on. When both have died the couple is simply shown together.
+ */
+export function partnershipEnd(graph: Graph<PersonLinks>, a: string, b: string): 'separated' | 'widowed' | null {
+  if (graph.separated.has(pairKey(a, b))) return 'separated'
+  if (!graph.byId.get(a)?.died !== !graph.byId.get(b)?.died) return 'widowed'
+  return null
 }

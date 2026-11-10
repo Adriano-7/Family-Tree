@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
+import { buildGraph, closeFamily, familySides, household, lineage, oldestGenerations, partnershipEnd, relation, relatives, siblings, visiblePeople } from '../src/data/graph'
 import { computeLayout, LAYER_GAP } from '../src/scene/layout'
 
 const person = (id: string, parents: string[] = [], spouses: string[] = [], born: string | null = null) => ({
@@ -249,5 +249,34 @@ describe('family sides and filters', () => {
     expect(mum.has('nonno')).toBe(false)
     expect(mum.has('aunt')).toBe(false)
     expect(relatives(g, 'nobody').size).toBe(0)
+  })
+
+  it('knows how a partnership ended', () => {
+    const g = buildGraph([
+      { ...person('a', [], ['b']), separated: ['b'] },
+      person('b'),
+      { ...person('c', [], ['d']), died: '2001' },
+      person('d'),
+      person('e', [], ['f']),
+      person('f'),
+      { ...person('i', [], ['j']), died: '1990' },
+      { ...person('j'), died: '2005' },
+      // Listed only as separated, on the other side: still a former partner.
+      { ...person('g'), separated: ['h'] },
+      person('h'),
+    ])
+    expect(partnershipEnd(g, 'b', 'a')).toBe('separated')
+    expect(partnershipEnd(g, 'd', 'c')).toBe('widowed')
+    expect(partnershipEnd(g, 'e', 'f')).toBeNull()
+    // Both have died: shown as a couple, not as a widow(er).
+    expect(partnershipEnd(g, 'i', 'j')).toBeNull()
+    expect(g.spouses.get('h')).toEqual(['g'])
+    expect(computeLayout(g).segments.filter((s) => s.kind === 'partner').map((s) => s.ended ?? null).sort()).toEqual([
+      'separated',
+      'separated',
+      'widowed',
+      null,
+      null,
+    ].sort())
   })
 })

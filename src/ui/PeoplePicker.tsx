@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { type ReactNode, useId, useMemo, useState } from 'react'
 import type { Person } from '../data/types'
 import { fold, lifeYears } from './format'
 import { strings } from './strings'
@@ -10,10 +10,12 @@ interface Props {
   value: string[]
   onChange: (ids: string[]) => void
   max?: number
+  /** Something extra to show on each chosen person's tag. */
+  tagExtra?: (id: string) => ReactNode
 }
 
 /** Chosen people as removable tags, plus a box to find and add another. */
-export function PeoplePicker({ label, candidates, value, onChange, max = Infinity }: Props) {
+export function PeoplePicker({ label, candidates, value, onChange, max = Infinity, tagExtra }: Props) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const inputId = useId()
@@ -39,6 +41,7 @@ export function PeoplePicker({ label, candidates, value, onChange, max = Infinit
           {value.map((id) => (
             <li key={id}>
               {byId.get(id)?.name ?? id}
+              {tagExtra?.(id)}
               <button
                 type="button"
                 aria-label={strings.pickerRemove(byId.get(id)?.name ?? id)}

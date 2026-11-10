@@ -30,8 +30,9 @@ function trialStore(): Store {
       return null
     }
   }
-  // People saved before family sides existed have no list of them.
-  const current = () => (read() ?? (bundled as Person[])).map((p) => ({ ...p, families: p.families ?? [] }))
+  // People saved before family sides and separations existed have no list of them.
+  const current = () =>
+    (read() ?? (bundled as Person[])).map((p) => ({ ...p, families: p.families ?? [], separated: p.separated ?? [] }))
   const write = (people: Person[]) => {
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(people))
@@ -87,6 +88,7 @@ function supabaseStore(baseUrl: string, key: string): Store {
         birthplace: row.birthplace ?? null,
         parents: row.parents ?? [],
         spouses: row.spouses ?? [],
+        separated: row.separated ?? [],
         families: row.families ?? [],
         thumb: toUrl(row.thumb ?? null),
         portrait: toUrl(row.portrait ?? null),
@@ -104,6 +106,7 @@ function supabaseStore(baseUrl: string, key: string): Store {
         birthplace: p.birthplace,
         parents: p.parents,
         spouses: p.spouses,
+        separated: p.separated,
         families: p.families,
         thumb: toPath(p.thumb),
         portrait: toPath(p.portrait),

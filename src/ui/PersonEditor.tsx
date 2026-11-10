@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cleanFamilies, EditError, slugFor } from '../data/edit'
-import { type Graph, lineage } from '../data/graph'
+import { type Graph, lineage, pairKey } from '../data/graph'
 import { prepareImage } from '../data/images'
 import type { Store } from '../data/store'
 import type { Person } from '../data/types'
@@ -44,6 +44,10 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
     isNew ? person.spouses : [...new Set([...(graph.spouses.get(person.id) ?? []), ...person.spouses])],
   )
   const [families, setFamilies] = useState(person.families)
+  // Separations either partner recorded.
+  const [separated, setSeparated] = useState(() =>
+    (graph.spouses.get(person.id) ?? person.spouses).filter((s) => graph.separated.has(pairKey(person.id, s))),
+  )
   const [familyDraft, setFamilyDraft] = useState('')
   // `undefined`: keep what is stored. `null`: removed. Otherwise a newly picked photo.
   const [portrait, setPortrait] = useState<{ thumb: Blob; full: Blob; preview: string } | null | undefined>(undefined)
@@ -139,6 +143,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
         birthplace: birthplace.trim() || null,
         parents,
         spouses: partners,
+        separated: separated.filter((s) => partners.includes(s)),
         // A name typed but not yet confirmed with Enter still counts.
         families: cleanFamilies([...families, familyDraft]),
         thumb,
@@ -199,7 +204,23 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
         </div>
 
         <PeoplePicker label={strings.fieldParents} candidates={parentCandidates} value={parents} onChange={setParents} max={2} />
-        <PeoplePicker label={strings.fieldPartners} candidates={partnerCandidates} value={partners} onChange={setPartners} />
+        <PeoplePicker
+          label={strings.fieldPartners}
+          candidates={partnerCandidates}
+          value={partners}
+          onChange={setPartners}
+          tagExtra={(id) => (
+            <button
+              type="button"
+              className="tag-toggle"
+              aria-pressed={separated.includes(id)}
+              title={strings.separatedHelp}
+              onClick={() => setSeparated((list) => (list.includes(id) ? list.filter((s) => s !== id) : [...list, id]))}
+            >
+              {strings.separatedTag}
+            </button>
+          )}
+        />
 
         <div className="field picker">
           <label htmlFor="f-families">{strings.fieldFamilies}</label>
