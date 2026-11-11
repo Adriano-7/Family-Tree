@@ -46,6 +46,12 @@ const { ACTION } = CameraControlsImpl
 const PAN_WITH_MOUSE = { left: ACTION.TRUCK, middle: ACTION.TRUCK, right: ACTION.TRUCK, wheel: ACTION.DOLLY }
 const PAN_WITH_TOUCH = { one: ACTION.TOUCH_TRUCK, two: ACTION.TOUCH_DOLLY_TRUCK, three: ACTION.TOUCH_DOLLY_TRUCK }
 
+// The controls multiply the distance by 0.95^(-deltaY / 30) for a turn of the wheel (/ 10 on a Mac).
+/** The wheel travel that changes the distance by a factor of e. */
+const WHEEL_PER_E = -(/Mac/.test(navigator.platform) ? 10 : 30) / Math.log(0.95)
+// A pinch arrives in much smaller steps, and should follow the fingers: about e^(deltaY / 100).
+const PINCH_BOOST = WHEEL_PER_E / 100
+
 function Scene({
   graph,
   layout,
@@ -156,6 +162,58 @@ function Scene({
   useEffect(() => {
     if (framed.current) frame(framed.current, false)
   }, [size.width, size.height])
+
+  // A pinch on a trackpad: the controls would narrow the lens, and far too slowly. It is handed
+  // back to them as a turn of the wheel of the same strength, so it moves the camera like one.
+  const canvas = useThree((s) => s.gl.domElement)
+  useEffect(() => {
+    let relaying = false
+    const relay = (at: { clientX: number; clientY: number }, deltaY: number) => {
+      relaying = true
+      canvas.dispatchEvent(new WheelEvent('wheel', { deltaY, clientX: at.clientX, clientY: at.clientY, bubbles: true, cancelable: true }))
+      relaying = false
+    }
+    // If the browser has magnified the page itself, pinches are left to it so the visitor can get back out.
+    const pageZoomed = () => (window.visualViewport?.scale ?? 1) > 1.01
+    // Chrome, Firefox and Edge report a pinch as a wheel turned with Ctrl held. It is caught anywhere on
+    // the page: over the controls the browser would otherwise magnify the page and push them off screen.
+    const onWheel = (e: WheelEvent) => {
+      if (relaying || !e.ctrlKey || pageZoomed()) return
+      // A real wheel turned with Ctrl held comes in whole notches (or in lines): no boost for that,
+      // and away from the tree it keeps its usual meaning of making the page bigger.
+      const notches = e.deltaMode !== 0 || (Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50)
+      if (notches && e.target !== canvas) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      relay(e, notches ? e.deltaY * (e.deltaMode === 1 ? 33 : 1) : e.deltaY * PINCH_BOOST)
+    }
+    // Safari on a Mac reports it as a gesture with a scale. (On a touch screen the fingers already zoom.)
+    let scale = 1
+    const onGestureStart = (e: Event) => {
+      if (pageZoomed()) return
+      e.preventDefault()
+      scale = 1
+    }
+    const onGestureChange = (e: Event) => {
+      if (pageZoomed()) return
+      e.preventDefault()
+      const g = e as Event & { scale: number; clientX: number; clientY: number }
+      if (!(g.scale > 0)) return
+      relay(g, -Math.log(g.scale / scale) * WHEEL_PER_E)
+      scale = g.scale
+    }
+    const trackpadGestures = navigator.maxTouchPoints === 0
+    window.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    if (trackpadGestures) {
+      window.addEventListener('gesturestart', onGestureStart)
+      window.addEventListener('gesturechange', onGestureChange)
+    }
+    return () => {
+      window.removeEventListener('wheel', onWheel, { capture: true })
+      window.removeEventListener('gesturestart', onGestureStart)
+      window.removeEventListener('gesturechange', onGestureChange)
+    }
+  }, [canvas])
 
   return (
     <>
