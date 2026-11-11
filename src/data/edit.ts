@@ -180,3 +180,37 @@ export function linkExisting(graph: Graph<Person>, mine: Person, relative: Relat
   const known = other.parents.filter((p) => graph.byId.has(p))
   return { ...other, parents: known.length === 0 && partners.length === 1 ? [me.id, partners[0]] : [...known, me.id] }
 }
+
+/** A change to a photo kept in somebody else's gallery, made by somebody who appears in it. */
+export interface PhotoEdit {
+  /** Whose gallery the photo is kept in. */
+  owner: string
+  src: string
+  caption: string
+  with: string[]
+}
+
+/** Writes changes to photos into the galleries they are kept in. */
+export function editPhotos(people: Person[], edits: PhotoEdit[]): EditResult {
+  const changed: Person[] = []
+  const next = people.map((p) => {
+    const mine = edits.filter((e) => e.owner === p.id)
+    if (!mine.length) return p
+    let touched = false
+    const gallery = p.gallery.map((g) => {
+      const edit = mine.find((e) => e.src === g.src)
+      if (!edit) return g
+      const withIds = [...new Set(edit.with)].filter((x) => x !== p.id)
+      const caption = edit.caption.trim()
+      if (caption === g.caption && withIds.join() === (g.with ?? []).join()) return g
+      touched = true
+      const { with: _, ...rest } = g
+      return { ...rest, caption, ...(withIds.length ? { with: withIds } : {}) }
+    })
+    if (!touched) return p
+    const updated = { ...p, gallery }
+    changed.push(updated)
+    return updated
+  })
+  return { people: next, changed }
+}

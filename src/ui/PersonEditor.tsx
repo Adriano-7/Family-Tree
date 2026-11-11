@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cleanFamilies, EditError, slugFor } from '../data/edit'
+import { cleanFamilies, EditError, type PhotoEdit, slugFor } from '../data/edit'
 import { type Graph, lineage, pairKey } from '../data/graph'
 import { prepareImage } from '../data/images'
+import { photosOf } from '../data/photos'
 import type { Store } from '../data/store'
 import type { Person } from '../data/types'
 import { asset } from './format'
@@ -13,7 +14,8 @@ interface Props {
   store: Store
   /** The person being changed, or the starting point for a new one (with an empty id). */
   person: Person
-  onSave: (person: Person) => Promise<void>
+  /** Also given the changes to photos other people keep that this person appears in. */
+  onSave: (person: Person, photoEdits: PhotoEdit[]) => Promise<void>
   onCancel: () => void
   onDelete?: () => Promise<void>
   /** The family sides that already exist, offered as suggestions. */
@@ -30,6 +32,17 @@ interface Photo {
   height: number
   /** Other people who appear in it. */
   with: string[]
+}
+
+/** A photo somebody else keeps that this person appears in: its caption and tags can be changed here too. */
+interface SharedPhoto {
+  owner: string
+  src: string
+  caption: string
+  /** Everybody else in it, besides its owner and this person. */
+  with: string[]
+  /** Whether this person is still tagged in it. */
+  present: boolean
 }
 
 let photoKey = 0
@@ -57,6 +70,21 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
   const [photos, setPhotos] = useState<Photo[]>(() =>
     person.gallery.map((g) => ({ key: `p${photoKey++}`, src: g.src, caption: g.caption, width: g.width, height: g.height, with: g.with ?? [] })),
   )
+  const [shared, setShared] = useState<SharedPhoto[]>(() =>
+    isNew
+      ? []
+      : photosOf(graph.people, person.id)
+          .filter((p) => p.owner !== person.id)
+          .map((p) => ({
+            owner: p.owner,
+            src: p.src,
+            caption: p.caption,
+            with: (p.with ?? []).filter((x) => x !== person.id && x !== p.owner),
+            present: true,
+          })),
+  )
+  const changeShared = (src: string, owner: string, change: Partial<SharedPhoto>) =>
+    setShared((list) => list.map((x) => (x.src === src && x.owner === owner ? { ...x, ...change } : x)))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -139,6 +167,12 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
           ...(p.with.length ? { with: p.with } : {}),
         })),
       )
+      const photoEdits: PhotoEdit[] = shared.map((p) => ({
+        owner: p.owner,
+        src: p.src,
+        caption: p.caption,
+        with: p.present ? [...p.with, id] : p.with,
+      }))
       await onSave({
         id,
         name,
@@ -155,7 +189,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
         portrait: full,
         gallery,
         bio: bio.trim(),
-      })
+      }, photoEdits)
     } catch (e) {
       const reason = e instanceof EditError ? e.reason : null
       setError(
@@ -301,7 +335,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
 
         <div className="field">
           <span className="label">{strings.fieldPhotos}</span>
-          {photos.length > 0 && (
+          {(photos.length > 0 || shared.some((p) => p.present)) && (
             <ul className="photo-list">
               {photos.map((p) => (
                 <li key={p.key}>
@@ -327,6 +361,30 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
                   </div>
                 </li>
               ))}
+              {shared
+                .filter((p) => p.present)
+                .map((p) => (
+                  <li key={`${p.owner}:${p.src}`}>
+                    <img src={asset(p.src)} alt="" />
+                    <input
+                      aria-label={strings.caption}
+                      placeholder={strings.caption}
+                      value={p.caption}
+                      onChange={(e) => changeShared(p.src, p.owner, { caption: e.target.value })}
+                    />
+                    <button type="button" className="quiet" onClick={() => changeShared(p.src, p.owner, { present: false })}>
+                      {strings.removePhoto}
+                    </button>
+                    <div className="photo-with">
+                      <PeoplePicker
+                        label={strings.photoWith}
+                        candidates={partnerCandidates.filter((c) => c.id !== p.owner)}
+                        value={p.with}
+                        onChange={(ids) => changeShared(p.src, p.owner, { with: ids })}
+                      />
+                    </div>
+                  </li>
+                ))}
             </ul>
           )}
           <div className="actions">

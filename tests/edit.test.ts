@@ -155,6 +155,18 @@ describe('photos shared between people', () => {
     expect(people[0].gallery[0].with).toEqual([])
     expect(changed.map((p) => p.id)).toEqual(['ana'])
   })
+
+  it('lets somebody in a photo change it in the gallery it is kept in', async () => {
+    const { editPhotos } = await import('../src/data/edit')
+    const people = [person('ana', { gallery: [photo('a.webp', ['rui']), photo('b.webp', ['rui'])] }), person('rui'), person('eva')]
+    const { people: next, changed } = editPhotos(people, [
+      { owner: 'ana', src: 'a.webp', caption: ' Praia ', with: ['eva', 'rui', 'ana'] },
+      { owner: 'ana', src: 'b.webp', caption: '', with: [] },
+    ])
+    expect(changed.map((p) => p.id)).toEqual(['ana'])
+    expect(next[0].gallery).toEqual([{ ...photo('a.webp', ['eva', 'rui']), caption: 'Praia' }, photo('b.webp')])
+    expect(editPhotos(people, [{ owner: 'ana', src: 'a.webp', caption: '', with: ['rui'] }]).changed).toEqual([])
+  })
 })
 
 describe('godparents', () => {

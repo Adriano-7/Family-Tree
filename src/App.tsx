@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { deletePerson, EditError, emptyPerson, linkExisting, type Relative, savePerson, withAllPartners } from './data/edit'
+import { deletePerson, EditError, editPhotos, emptyPerson, linkExisting, type PhotoEdit, type Relative, savePerson, withAllPartners } from './data/edit'
 import { HOME_PERSON } from './config'
 import { buildGraph, connected, familySides, type Filter, household, lineage, pairKey, relation, relatives, visiblePeople } from './data/graph'
 import { createStore } from './data/store'
@@ -278,9 +278,13 @@ export default function App() {
     setTrialChanges(store.hasLocalChanges?.() ?? false)
   }
 
-  const commit = async (person: Person) => {
+  const commit = async (person: Person, photoEdits: PhotoEdit[] = []) => {
     let result = savePerson(people ?? [], person)
     const changed = [...result.changed]
+    if (photoEdits.length) {
+      result = editPhotos(result.people, photoEdits)
+      changed.push(...result.changed)
+    }
     const child = editing?.childId ? result.people.find((p) => p.id === editing.childId) : undefined
     if (child) {
       result = savePerson(result.people, { ...withAllPartners(graph, child), parents: [...child.parents, person.id] })
@@ -291,7 +295,8 @@ export default function App() {
       result = savePerson(result.people, { ...withAllPartners(graph, godchild), godparents: [...godchild.godparents, person.id] })
       changed.push(...result.changed)
     }
-    await store.save(changed)
+    // The last version of each record is the one to write.
+    await store.save([...new Map(changed.map((p) => [p.id, p])).values()])
     setPeople(result.people)
     setTrialChanges(store.hasLocalChanges?.() ?? false)
     setEditing(null)
