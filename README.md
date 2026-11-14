@@ -79,6 +79,16 @@ The site is public, so think about what you write for relatives who are alive: a
 
 `npm run build` creates the finished site in `dist/`. It is plain files and works on a static host that serves it from the root of a domain and sends unknown paths to `index.html` (Cloudflare Pages does both by default), because a side of the family has its own address, like `/machado`.
 
+## Visitor statistics with Google Analytics
+
+1. At [analytics.google.com](https://analytics.google.com), create a property for the site and a **Web** data stream with the site's address.
+2. Copy the stream's measurement ID (it looks like `G-XXXXXXXXXX`).
+3. Set it as `VITE_GA_ID` where the site is published (a build setting, next to the two Supabase values), and publish again.
+
+Only the published site is measured, never `npm run dev`. Without the ID nothing is added to the page.
+
+Google Analytics stores cookies in the visitor's browser. For visitors in the EU that needs their consent first, which this site does not ask for.
+
 ## Change the wording or language
 
 All interface text is in `src/ui/strings.ts`.
