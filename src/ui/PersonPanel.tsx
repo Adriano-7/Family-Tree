@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { linkCandidates, type Relative } from '../data/edit'
 import { type Graph, partnershipEnd, siblings } from '../data/graph'
 import type { Person } from '../data/types'
-import { initialsOf } from '../scene/textures'
+import { Avatar } from './Avatar'
 import { asset, lifeDates, lifeYears } from './format'
 import { renderBio } from './bio'
 import { AddRelative } from './AddRelative'
@@ -52,13 +52,7 @@ function Relatives({
         {people.map((p) => (
           <li key={p.id}>
             <a href={personHref(p.id)}>
-              {p.thumb ? (
-                <img src={asset(p.thumb)} alt="" width={36} height={36} />
-              ) : (
-                <span className="initials" aria-hidden="true">
-                  {initialsOf(p.name)}
-                </span>
-              )}
+              <Avatar person={p} />
               <span>
                 {p.name}
                 <small>{[lifeYears(p), note?.(p.id)].filter(Boolean).join(' · ')}</small>

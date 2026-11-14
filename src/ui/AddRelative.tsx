@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import type { Relative } from '../data/edit'
 import type { Person } from '../data/types'
+import { Avatar } from './Avatar'
 import { lifeYears } from './format'
 import { searchPeople } from './search'
 import { strings } from './strings'
@@ -92,7 +93,8 @@ export function AddRelative({ relative, candidates, onLink, onCreate, onCancel }
             onPointerMove={() => setActive(i)}
             onClick={() => void choose(i)}
           >
-            <span>{p.name}</span>
+            <Avatar person={p} />
+            <span className="who">{p.name}</span>
             <span className="years">{lifeYears(p)}</span>
           </li>
         ))}

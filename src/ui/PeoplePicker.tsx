@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useMemo, useState } from 'react'
 import type { Person } from '../data/types'
+import { Avatar } from './Avatar'
 import { lifeYears } from './format'
 import { searchPeople } from './search'
 import { strings } from './strings'
@@ -45,6 +46,7 @@ export function PeoplePicker({ label, candidates, value, onChange, max = Infinit
         <ul className="chosen">
           {value.map((id) => (
             <li key={id}>
+              {byId.has(id) && <Avatar person={byId.get(id)!} />}
               {byId.get(id)?.name ?? id}
               {tagExtra?.(id)}
               <button
@@ -94,7 +96,8 @@ export function PeoplePicker({ label, candidates, value, onChange, max = Infinit
                   onPointerMove={() => setActive(i)}
                   onClick={() => add(p)}
                 >
-                  <span>{p.name}</span>
+                  <Avatar person={p} />
+                  <span className="who">{p.name}</span>
                   <span className="years">{lifeYears(p)}</span>
                 </li>
               ))}

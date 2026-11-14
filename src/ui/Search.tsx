@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import type { Person } from '../data/types'
+import { Avatar } from './Avatar'
 import { lifeYears } from './format'
 import { SearchIcon } from './icons'
 import { searchPeople } from './search'
@@ -74,6 +75,7 @@ export function Search({ people, onSelect }: Props) {
               onPointerMove={() => setActive(i)}
               onClick={() => choose(p)}
             >
+              <Avatar person={p} />
               <span className="who">
                 {p.name}
                 {hint && <small>{hint}</small>}

@@ -780,21 +780,46 @@ button:disabled {
   background: var(--wash);
 }
 
-.relatives img,
-.relatives .initials {
+/* A face beside a name, wherever somebody is picked out of a list. */
+.avatar {
   flex: none;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--avatar, 1.75rem);
+  height: var(--avatar, 1.75rem);
   border-radius: 50%;
   border: 1px solid var(--line);
+  object-fit: cover;
 }
 
-.relatives .initials {
+.avatar.initials {
   display: grid;
   place-items: center;
-  background: none;
   color: var(--paper);
-  font: 500 0.78rem var(--text);
+  font: 500 calc(var(--avatar, 1.75rem) * 0.36) / 1 var(--text);
+}
+
+.relatives .avatar {
+  --avatar: 2.25rem;
+}
+
+.chosen .avatar {
+  --avatar: 1.35rem;
+  margin: 0 0.25rem 0 -0.3rem;
+}
+
+/* In a list of matches the name takes the room between the face and the years. */
+.search li,
+.add-relative-list li:not(.create),
+.options li:not(.none) {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+}
+
+.search .who,
+.add-relative-list .who,
+.options .who {
+  flex: 1;
+  min-width: 0;
 }
 
 .relatives small {
