@@ -1,7 +1,8 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import type { Person } from '../data/types'
-import { fold, lifeYears } from './format'
+import { lifeYears } from './format'
 import { SearchIcon } from './icons'
+import { searchPeople } from './search'
 import { strings } from './strings'
 
 interface Props {
@@ -17,11 +18,7 @@ export function Search({ people, onSelect }: Props) {
   const listId = useId()
   const input = useRef<HTMLInputElement>(null)
 
-  const sorted = useMemo(() => [...people].sort((a, b) => a.name.localeCompare(b.name)), [people])
-  const results = useMemo(() => {
-    const q = fold(query.trim())
-    return q ? sorted.filter((p) => fold(p.name).includes(q)) : sorted
-  }, [sorted, query])
+  const results = useMemo(() => searchPeople(people, query, true), [people, query])
 
   const choose = (p: Person | undefined) => {
     if (!p) return
@@ -41,7 +38,7 @@ export function Search({ people, onSelect }: Props) {
         aria-label={strings.searchLabel}
         aria-expanded={open}
         aria-controls={listId}
-        aria-activedescendant={open && results[active] ? `${listId}-${results[active].id}` : undefined}
+        aria-activedescendant={open && results[active] ? `${listId}-${results[active].person.id}` : undefined}
         aria-autocomplete="list"
         placeholder={strings.searchPlaceholder}
         autoComplete="off"
@@ -58,13 +55,13 @@ export function Search({ people, onSelect }: Props) {
             setOpen(true)
             const step = e.key === 'ArrowDown' ? 1 : -1
             setActive((i) => (results.length ? (i + step + results.length) % results.length : 0))
-          } else if (e.key === 'Enter') choose(results[active])
+          } else if (e.key === 'Enter') choose(results[active]?.person)
           else if (e.key === 'Escape') setOpen(false)
         }}
       />
       {open && (
         <ul id={listId} role="listbox" aria-label={strings.searchLabel}>
-          {results.map((p, i) => (
+          {results.map(({ person: p, hint }, i) => (
             <li
               key={p.id}
               id={`${listId}-${p.id}`}
@@ -77,7 +74,10 @@ export function Search({ people, onSelect }: Props) {
               onPointerMove={() => setActive(i)}
               onClick={() => choose(p)}
             >
-              <span>{p.name}</span>
+              <span className="who">
+                {p.name}
+                {hint && <small>{hint}</small>}
+              </span>
               <span className="years">{lifeYears(p)}</span>
             </li>
           ))}

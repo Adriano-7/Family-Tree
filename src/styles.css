@@ -189,6 +189,20 @@ button {
   cursor: pointer;
 }
 
+.search .who {
+  min-width: 0;
+}
+
+/* Where the words were found, when it was not in the name. */
+.search .who small {
+  display: block;
+  overflow: hidden;
+  color: var(--haze);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search li[aria-selected='true'] {
   background: var(--wash);
 }

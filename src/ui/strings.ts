@@ -4,7 +4,7 @@ export const strings = {
   empty: 'Ainda não há ninguém. Adicione um ficheiro a content/people para colocar a primeira estrela.',
   searchLabel: 'Procurar uma pessoa',
   searchPlaceholder: 'Procurar',
-  searchNoResults: 'Ninguém com esse nome',
+  searchNoResults: 'Ninguém encontrado',
   wholeTree: 'Ver a árvore toda',
   people: (n: number) => `${n} ${n === 1 ? 'pessoa' : 'pessoas'}`,
   shownOf: (shown: number, total: number) => `${shown} de ${total}`,

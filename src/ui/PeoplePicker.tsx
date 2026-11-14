@@ -1,6 +1,7 @@
 import { type ReactNode, useId, useMemo, useState } from 'react'
 import type { Person } from '../data/types'
-import { fold, lifeYears } from './format'
+import { lifeYears } from './format'
+import { searchPeople } from './search'
 import { strings } from './strings'
 
 interface Props {
@@ -21,9 +22,13 @@ export function PeoplePicker({ label, candidates, value, onChange, max = Infinit
   const inputId = useId()
   const byId = useMemo(() => new Map(candidates.map((p) => [p.id, p])), [candidates])
   const matches = useMemo(() => {
-    const q = fold(query.trim())
-    if (!q) return []
-    return candidates.filter((p) => !value.includes(p.id) && fold(p.name).includes(q)).slice(0, 8)
+    if (!query.trim()) return []
+    return searchPeople(
+      candidates.filter((p) => !value.includes(p.id)),
+      query,
+    )
+      .map((hit) => hit.person)
+      .slice(0, 8)
   }, [candidates, value, query])
 
   const add = (p: Person | undefined) => {

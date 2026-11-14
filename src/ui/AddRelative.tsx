@@ -1,7 +1,8 @@
 import { useId, useMemo, useState } from 'react'
 import type { Relative } from '../data/edit'
 import type { Person } from '../data/types'
-import { fold, lifeYears } from './format'
+import { lifeYears } from './format'
+import { searchPeople } from './search'
 import { strings } from './strings'
 
 interface Props {
@@ -24,11 +25,9 @@ export function AddRelative({ relative, candidates, onLink, onCreate, onCancel }
   const listId = useId()
 
   const matches = useMemo(() => {
-    const q = fold(query.trim())
-    if (!q) return []
-    return candidates
-      .filter((p) => fold(p.name).includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    if (!query.trim()) return []
+    return searchPeople(candidates, query)
+      .map((hit) => hit.person)
       .slice(0, 8)
   }, [candidates, query])
   // The matches, then "new person" last: an existing person is usually what is meant.
