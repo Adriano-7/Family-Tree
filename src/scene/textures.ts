@@ -77,10 +77,3 @@ export function labelTexture(name: string, muted = false) {
   return toTexture(c)
 }
 
-export const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name
-
-/** First and last name: short enough to sit under a star without covering the neighbours. */
-export function shortNameOf(name: string) {
-  const words = name.trim().split(/\s+/)
-  return words.length > 1 ? `${words[0]} ${words[words.length - 1]}` : name
-}

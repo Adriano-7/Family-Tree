@@ -10,6 +10,8 @@ export interface GalleryImage {
 export interface Person {
   id: string
   name: string
+  /** The name this person goes by, when it is not the first one ("Hugo" for Adalberto Hugo). */
+  nickname?: string | null
   /** "1938", "1938-04" or "1938-04-12" */
   born: string | null
   died: string | null

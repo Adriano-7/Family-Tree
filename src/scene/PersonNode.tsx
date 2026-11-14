@@ -3,9 +3,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Person } from '../data/types'
-import { asset, lifeYears } from '../ui/format'
+import { asset, callName, labelName, lifeYears } from '../ui/format'
 import type { Vec3 } from './layout'
-import { firstNameOf, shortNameOf, haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
+import { haloTexture, initialsTexture, LABEL_ASPECT, labelTexture } from './textures'
 
 export type NodeEmphasis = 'normal' | 'lit' | 'dim'
 
@@ -43,8 +43,8 @@ export function PersonNode({ person, position, tint, emphasis, active, onHover, 
   const fade = useRef(1)
 
   const initials = useMemo(() => initialsTexture(person.name, tint), [person.name, tint])
-  const nameTexture = useMemo(() => labelTexture(shortNameOf(person.name)), [person.name])
-  const firstNameTexture = useMemo(() => labelTexture(firstNameOf(person.name)), [person.name])
+  const nameTexture = useMemo(() => labelTexture(labelName(person)), [person.name, person.nickname])
+  const firstNameTexture = useMemo(() => labelTexture(callName(person)), [person.name, person.nickname])
   const years = showYears ? lifeYears(person) : ''
   const yearsTexture = useMemo(() => (years ? labelTexture(years, true) : null), [years])
   const [photo, setPhoto] = useState<THREE.Texture | null>(null)

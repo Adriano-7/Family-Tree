@@ -88,6 +88,7 @@ function supabaseStore(baseUrl: string, key: string): Store {
       return rows.map((row) => ({
         id: row.id,
         name: row.name,
+        nickname: row.nickname ?? null,
         born: row.born ?? null,
         died: row.died ?? null,
         birthplace: row.birthplace ?? null,
@@ -107,6 +108,7 @@ function supabaseStore(baseUrl: string, key: string): Store {
       const rows = people.map((p) => ({
         id: p.id,
         name: p.name,
+        nickname: p.nickname ?? null,
         born: p.born,
         died: p.died,
         birthplace: p.birthplace,

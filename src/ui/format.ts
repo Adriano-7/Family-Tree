@@ -30,6 +30,19 @@ export function lifeDates(p: Pick<Person, 'born' | 'died'>) {
 /** Photos from the project are relative paths; uploaded ones are complete addresses. */
 export const asset = (path: string) => (/^(https?:|data:|blob:)/.test(path) ? path : import.meta.env.BASE_URL + path)
 
+/** What to call somebody in a few letters: the name they go by, otherwise the first one. */
+export const callName = (p: Pick<Person, 'name' | 'nickname'>) => p.nickname?.trim() || p.name.trim().split(/\s+/)[0] || p.name
+
+/** The name under a star: first (or preferred) and last name, short enough not to cover the neighbours. */
+export function labelName(p: Pick<Person, 'name' | 'nickname'>) {
+  const words = p.name.trim().split(/\s+/)
+  const last = words.length > 1 ? words[words.length - 1] : ''
+  const first = callName(p)
+  // A preferred name of several words, or one that already ends in the surname, stands by itself.
+  if (!last || (p.nickname && (/\s/.test(first) || fold(first) === fold(last)))) return first
+  return `${first} ${last}`
+}
+
 export const fold = (s: string) =>
   s
     .normalize('NFD')

@@ -24,6 +24,9 @@ alter table public.people add column if not exists separated text[] not null def
 -- This person's godparents (padrinho, madrinha).
 alter table public.people add column if not exists godparents text[] not null default '{}';
 
+-- The name this person goes by, when it is not the first one.
+alter table public.people add column if not exists nickname text;
+
 -- Anyone with the link to the site can read and edit the tree.
 alter table public.people enable row level security;
 grant select, insert, update, delete on public.people to anon, authenticated;

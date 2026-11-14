@@ -688,6 +688,12 @@ button:disabled {
   text-wrap: balance;
 }
 
+.panel .known-as {
+  margin-top: 0.3rem;
+  color: var(--haze);
+  font-style: italic;
+}
+
 .panel .dates {
   margin-top: 0.6rem;
   color: var(--warm);

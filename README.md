@@ -37,6 +37,7 @@ Then open the address it prints. The page updates by itself when you change anyt
 Only `name` is required. Some details:
 
 - `born` and `died` accept `1938`, `1938-04` or `1938-04-12`.
+- `nickname` (optional, e.g. `nickname: Hugo`) is the name this person goes by, when it is not their first name. The tree then shows it under their star, and the search finds them by it.
 - `families` (optional, e.g. `families: [Machado]`) names the family sides that start with this person. Write it only on the oldest person of each side: their descendants belong to it automatically, and the site can then show one side at a time.
 - `separated` (optional, e.g. `separated: [joao-silva]`) marks partners this person separated or divorced from; like `spouses`, it only needs to be written on one of the two. The line between them is then drawn broken.
 - `godparents` (optional, e.g. `godparents: [rui-santos, ana-santos]`) names this person's padrinho and madrinha. Write it on the godchild only: the godparent's panel lists their afilhados by itself.

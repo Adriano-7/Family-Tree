@@ -103,6 +103,7 @@ export function PersonPanel({ graph, person, onClose, onEdit, onAdd, onLink, sid
       {person.portrait && <img className="portrait" src={asset(person.portrait)} alt="" />}
       <div className="panel-body">
         <h2 id="person-name">{person.name}</h2>
+        {person.nickname && <p className="known-as">{strings.knownAs(person.nickname)}</p>}
         {(dates || person.birthplace) && (
           <p className="dates">
             {[dates, person.birthplace && strings.bornIn(person.birthplace)].filter(Boolean).join(', ')}

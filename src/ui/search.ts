@@ -31,7 +31,7 @@ function excerpt(text: string, word: string, around = 28) {
 
 /**
  * Every word typed has to be found, in any order and anywhere in a word: "ana vieira" finds
- * Ana Cristina Magalhães Vieira. With `everything`, the birthplace, the years and the story count too.
+ * Ana Cristina Magalhães Vieira. The name somebody goes by counts as their name. With `everything`, the birthplace, the years and the story count too.
  * People found by name come first.
  */
 export function searchPeople(people: Person[], query: string, everything = false): SearchHit[] {
@@ -43,9 +43,12 @@ export function searchPeople(people: Person[], query: string, everything = false
   const byText: SearchHit[] = []
   for (const person of sorted) {
     const name = fold(person.name)
-    const missing = wanted.filter((w) => !name.includes(w))
+    const nickname = fold(person.nickname ?? '')
+    const missing = wanted.filter((w) => !name.includes(w) && !nickname.includes(w))
     if (!missing.length) {
-      byName.push({ person })
+      // Found by the name they go by: show it, since the full name alone would not explain the match.
+      const byNickname = person.nickname && wanted.some((w) => !name.includes(w))
+      byName.push(byNickname ? { person, hint: person.nickname! } : { person })
       continue
     }
     if (!everything) continue

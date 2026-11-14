@@ -24,6 +24,14 @@ describe('searchPeople', () => {
     expect(names('ana machado')).toEqual([])
   })
 
+  it('finds people by the name they go by', () => {
+    const hits = searchPeople([...people, person('Adalberto Hugo Santos', { nickname: 'Hugo' }), person('Zeca Machado', { nickname: 'Hugo' })], 'hugo')
+    expect(hits.map((h) => [h.person.name, h.hint])).toEqual([
+      ['Adalberto Hugo Santos', undefined],
+      ['Zeca Machado', 'Hugo'],
+    ])
+  })
+
   it('reads the rest of the person only when asked', () => {
     expect(names('amarante')).toEqual([])
     expect(names('amarante', true)).toEqual(['Rosa Machado'])

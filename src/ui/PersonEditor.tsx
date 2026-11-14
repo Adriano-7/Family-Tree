@@ -50,6 +50,7 @@ let photoKey = 0
 export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete, sideNames }: Props) {
   const isNew = !person.id
   const [name, setName] = useState(person.name)
+  const [nickname, setNickname] = useState(person.nickname ?? '')
   const [born, setBorn] = useState(person.born ?? '')
   const [died, setDied] = useState(person.died ?? '')
   const [birthplace, setBirthplace] = useState(person.birthplace ?? '')
@@ -176,6 +177,7 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
       await onSave({
         id,
         name,
+        nickname: nickname.trim() || null,
         born: born.trim() || null,
         died: died.trim() || null,
         birthplace: birthplace.trim() || null,
@@ -224,6 +226,12 @@ export function PersonEditor({ graph, store, person, onSave, onCancel, onDelete,
           <label htmlFor="f-name">{strings.fieldName}</label>
           <input id="f-name" ref={nameInput} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
         </div>
+
+        <div className="field">
+          <label htmlFor="f-nickname">{strings.fieldNickname}</label>
+          <input id="f-nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} autoComplete="off" />
+        </div>
+        <p className="help">{strings.fieldNicknameHelp}</p>
 
         <div className="field-row">
           <div className="field">

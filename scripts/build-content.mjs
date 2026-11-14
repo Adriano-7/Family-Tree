@@ -89,6 +89,7 @@ for (const file of files) {
     id,
     label,
     name: d.name.trim(),
+    nickname: d.nickname ? String(d.nickname).trim() || null : null,
     born: normaliseDate(d.born, 'born', label),
     died: normaliseDate(d.died, 'died', label),
     birthplace: d.birthplace ? String(d.birthplace) : null,
@@ -156,6 +157,7 @@ for (const p of raw) {
   const person = {
     id: p.id,
     name: p.name,
+    nickname: p.nickname,
     born: p.born,
     died: p.died,
     birthplace: p.birthplace,

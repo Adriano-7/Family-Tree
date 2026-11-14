@@ -30,6 +30,7 @@ for (const p of people) {
   rows.push({
     id: p.id,
     name: p.name,
+    nickname: p.nickname ?? null,
     born: p.born,
     died: p.died,
     birthplace: p.birthplace,

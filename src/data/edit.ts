@@ -7,6 +7,7 @@ export function emptyPerson(): Person {
   return {
     id: '',
     name: '',
+    nickname: null,
     born: null,
     died: null,
     birthplace: null,
@@ -69,6 +70,7 @@ export function savePerson(people: Person[], person: Person): EditResult {
   const clean: Person = {
     ...person,
     name: person.name.trim(),
+    nickname: person.nickname?.trim() || null,
     parents: [...new Set(person.parents)].filter((p) => p !== person.id),
     spouses: [...new Set(person.spouses)].filter((s) => s !== person.id),
     // Only somebody who is (or was) a partner can be separated from.

@@ -13,6 +13,7 @@ import { HomeIcon, PlusIcon, WholeTreeIcon } from './ui/icons'
 import { kinshipName } from './ui/kinship'
 import { PersonEditor } from './ui/PersonEditor'
 import { PersonPanel } from './ui/PersonPanel'
+import { callName } from './ui/format'
 import { Search } from './ui/Search'
 import { strings } from './ui/strings'
 
@@ -211,7 +212,10 @@ export default function App() {
     setFocus({ kind: 'relation', from: relatingFrom, to: id })
     setRelatingFrom(null)
   }
-  const firstName = (id: string) => graph.byId.get(id)?.name.split(' ')[0] ?? ''
+  const firstName = (id: string) => {
+    const p = graph.byId.get(id)
+    return p ? callName(p) : ''
+  }
   const kin =
     related && focus?.kind === 'relation' && related.partners && graph.separated.has(pairKey(focus.from, focus.to))
       ? strings.exPartner
