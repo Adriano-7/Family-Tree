@@ -235,9 +235,19 @@ export default function App() {
     return () => window.removeEventListener('pointerdown', close)
   }, [labelsOpen])
 
-  // The visit starts on the home household, unless a link asked for a filtered tree: then on all of it.
+  // The visit starts on the home household. A link to somebody's family or line starts close in on
+  // that person and their nearest (parents, brothers and sisters, partners, children); any other
+  // filtered tree starts on all of it.
   const filtered = view !== graph
-  const homeIds = useMemo(() => (filtered ? [] : [...household(graph, HOME_PERSON)]), [graph, filtered])
+  const focusId = focus?.kind === 'family' || focus?.kind === 'line' ? focus.id : null
+  const homeIds = useMemo(() => {
+    if (focusId) {
+      const near = household(graph, focusId)
+      for (const id of [...(graph.spouses.get(focusId) ?? []), ...(graph.children.get(focusId) ?? [])]) near.add(id)
+      return [...near].filter((id) => visible?.has(id) ?? true)
+    }
+    return filtered ? [] : [...household(graph, HOME_PERSON)]
+  }, [graph, filtered, focusId, visible])
 
   // What is on show lives in the address too, so it can be shared: a direct line or a
   // relationship, otherwise the chosen side. An address that names nothing known is tidied back to /.
